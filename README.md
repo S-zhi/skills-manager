@@ -20,6 +20,16 @@ Deleting managed Skills now moves them to `Skill Manager/.trash/<entry ID>/conte
 
 Restore preserves files/UUIDs and refuses occupied destinations or duplicate UUIDs. Package references remain; retained IDE symlinks may temporarily break and reconnect when the original path is restored. Independent IDE copies are unaffected. GitHub auto backup still mirrors removal from the active library. Moves use rename only; cross-volume failures retain the source. Disk errors may leave a batch partially completed with the completed count reported. Permanent deletion cannot be undone from the app.
 
+## Settings center and translation configuration (Windows first)
+
+Settings is now split into four focused pages: **Updates, Cloud backup, Appearance, and Translation**. Update checks and the in-app GitHub link now target the current `S-zhi/skills-manager` repository.
+
+**Settings → Translation** has two configuration layers. The basic layer supports Azure Translator, DeepL, Google Cloud Translation, MyMemory, and LibreTranslate. The advanced layer supports Gemini and OpenAI-compatible services with model, base URL, temperature, and Markdown/YAML/code-structure preservation options. This release adds the **configuration layer**; translation actions will be connected to skill editing and batch workflows later, so it does not yet automatically rewrite a Skill.
+
+Non-sensitive values are stored at `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json` without changing the `Skill Manager\Skills` layout. API keys are **kept only in process memory, never written to JSON, and never returned from the backend to the UI**; enter them again after restarting the app. Remote endpoints must use HTTPS. HTTP is accepted only for a local LibreTranslate server on localhost/127.0.0.1. MyMemory's public anonymous service is typically limited to about 5,000 characters/day, may change, and should not receive private Skill content.
+
+The updater manifest now points to the current repository. New `latest.json` manifests and installers must still be signed with the private key matching the public key in `src-tauri/tauri.conf.json`. If the signing key changes, update the embedded public key as well or clients will reject the update.
+
 ## GitHub backup (Windows first)
 
 Open **Settings → GitHub backup** to bind a repository. This is **one-way local-to-GitHub upload**, not bidirectional synchronization.
@@ -77,7 +87,7 @@ A cross-platform AI Skills Manager. Search the bundled directory or the live Ski
 
 ### 📥 Installation & Usage
 
-- **General Users (Recommended)**: Simply head to the [Releases page](https://github.com/Rito-w/skills-manager/releases) to download the latest executable installer.
+- **General Users (Recommended)**: Simply head to the [Releases page](https://github.com/S-zhi/skills-manager/releases) to download the latest executable installer.
 - **Developers**: Clone the source code repository to run locally or customize in-depth.
 
 ### 🍎 macOS Security Note

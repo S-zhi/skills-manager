@@ -24,6 +24,16 @@
 
 永久删除需要输入 `DELETE` 二次确认，删除后不能从应用回收站恢复。只允许操作管理库中的直接 Skill 子目录；链接/junction 目录被拒绝。移动采用重命名，跨磁盘失败时保留源文件并提示。批量操作遇到磁盘错误时可能部分完成，错误提示包含已回收数量。
 
+## 设置中心与翻译配置（Windows 优先）
+
+“设置”已拆分为 **检查更新、云端备份、外观设置、翻译配置** 四个独立页面，不再把所有选项堆在同一长页面。检查更新和应用内 GitHub 链接指向当前仓库 `S-zhi/skills-manager`。
+
+“设置 → 翻译配置”提供两层配置：基础层支持 Azure Translator、DeepL、Google Cloud Translation、MyMemory 与 LibreTranslate；高级层支持 Gemini 和 OpenAI Compatible 服务，并可配置模型、Base URL、Temperature 及 Markdown/YAML/代码结构保护。当前版本完成的是**配置接入**，实际翻译动作后续会从 Skill 编辑或批处理流程调用，不应理解为已经自动改写 Skill。
+
+非敏感设置写入 `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json`，不改变 `Skill Manager\Skills` 的文件布局。API Key **只保留在当前应用进程内存中，不写入 JSON，也不会从后端回传界面**；关闭应用后需要重新输入。远程地址必须使用 HTTPS，只有本机 `localhost` / `127.0.0.1` 的 LibreTranslate 服务允许 HTTP。MyMemory 的公共匿名服务通常约 5,000 字符/天，额度可能变化，不要用于私密 Skill 内容。
+
+更新清单地址已切换到当前仓库。发布新版本时，`latest.json` 和安装包仍必须使用与 `src-tauri/tauri.conf.json` 中公钥匹配的私钥签名；如果更换发布签名密钥，必须同时更新应用内公钥，否则客户端会拒绝更新。
+
 ## GitHub 自动备份（Windows 优先）
 
 在 **设置 → GitHub 云端备份** 中绑定自己的仓库。此版本是**本地向 GitHub 单向上传**，不是双向同步；不会下载或合并远端修改。
@@ -85,7 +95,7 @@ Windows 使用随深浅色主题切换的简洁标题栏，显示名称为 **Ski
 
 ### 📥 获取与使用
 
-- **普通用户（推荐）**：直接前往 [Releases 页面](https://github.com/Rito-w/skills-manager/releases) 下载最新版本安装包即可。
+- **普通用户（推荐）**：直接前往 [Releases 页面](https://github.com/S-zhi/skills-manager/releases) 下载最新版本安装包即可。
 - **开发者**：拉取源码在本地运行，或进行深度定制。
 
 ### 🍎 macOS 安全使用要求
