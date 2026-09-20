@@ -84,6 +84,7 @@ export type DiscoveredSkill = {
   skillMdPath: string;
   provider: string;
   isStandard: boolean;
+  isDuplicate: boolean;
   issues: string[];
 };
 

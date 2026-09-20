@@ -159,6 +159,7 @@ pub struct DiscoveredSkill {
     pub skill_md_path: String,
     pub provider: String,
     pub is_standard: bool,
+    pub is_duplicate: bool,
     pub issues: Vec<String>,
 }
 

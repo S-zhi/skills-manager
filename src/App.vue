@@ -158,7 +158,13 @@ const {
 const showProjectAddModal = ref(false);
 const showProjectConfigModal = ref(false);
 const showCreateSkillModal = ref(false);
+const showImportSkillModal = ref(false);
 const configuringProject = ref<typeof selectedProject.value>(null);
+
+function closeImportSkillModal() {
+  showImportSkillModal.value = false;
+  clearDiscoveredSkills();
+}
 
 async function handleAddProject() {
   showProjectAddModal.value = true;
@@ -223,7 +229,7 @@ async function handleLinkSkills(projectId: string) {
     <header class="header">
       <div class="brand"><span class="brand-mark">S</span><div>Skill Manager<small>YOUR PERSONAL TOOLKIT</small></div></div>
       <div class="tabs">
-        <button class="tab" :class="{ active: activeTab === 'local' || activeTab === 'import' }" @click="activeTab = 'local'">
+        <button class="tab" :class="{ active: activeTab === 'local' }" @click="activeTab = 'local'">
           <AppIcon name="library" />
           {{ t("app.tabs.local") }}
         </button>
@@ -318,25 +324,9 @@ async function handleLinkSkills(projectId: string) {
           @open-dir="openSkillDirectory"
           @create="showCreateSkillModal = true"
           @refresh="scanLocalSkills"
-          @import="activeTab = 'import'"
+          @import="showImportSkillModal = true"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
-        />
-      </template>
-
-      <template v-else-if="activeTab === 'import'">
-        <DiscoveryPanel
-          :skills="discoveredSkills"
-          :root-path="discoveryRoot"
-          :loading="discoveryLoading"
-          :importing="discoveryImporting"
-          :import-results="discoveryImportResults"
-          :storage="managerStorage"
-          @back="activeTab = 'local'"
-          @discover="discoverSkillsInDirectory"
-          @clear="clearDiscoveredSkills"
-          @import="importDiscoveredSkills"
-          @open-dir="openSkillDirectory"
         />
       </template>
 
@@ -414,6 +404,20 @@ async function handleLinkSkills(projectId: string) {
       @close="showCreateSkillModal = false"
       @created="scanLocalSkills"
       @view="showCreateSkillModal = false"
+      @open-dir="openSkillDirectory"
+    />
+
+    <DiscoveryPanel
+      v-if="showImportSkillModal"
+      :skills="discoveredSkills"
+      :root-path="discoveryRoot"
+      :loading="discoveryLoading"
+      :importing="discoveryImporting"
+      :import-results="discoveryImportResults"
+      @close="closeImportSkillModal"
+      @discover="discoverSkillsInDirectory"
+      @clear="clearDiscoveredSkills"
+      @import="importDiscoveredSkills"
       @open-dir="openSkillDirectory"
     />
 

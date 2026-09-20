@@ -636,8 +636,47 @@ fn inspect_discovered_skill(skill_md_path: &Path) -> DiscoveredSkill {
         skill_md_path: skill_md_path.display().to_string(),
         provider: detect_skill_provider(skill_dir),
         is_standard: issues.is_empty(),
+        is_duplicate: false,
         issues,
     }
+}
+
+fn is_managed_duplicate(source_path: &Path, layout: &ManagerLayout) -> Result<bool, String> {
+    let Some(source_canonical) = resolve_canonical(source_path) else {
+        return Ok(false);
+    };
+    let skills_root =
+        resolve_canonical(&layout.skills).unwrap_or_else(|| normalize_path(&layout.skills));
+    if source_canonical.starts_with(&skills_root) {
+        return Ok(true);
+    }
+
+    let source_uuid = read_skill_uuid(&source_canonical);
+    let source_path_string = source_canonical.display().to_string();
+    for record in read_import_records(layout) {
+        let target = PathBuf::from(&record.target_path);
+        if record.source_path != source_path_string || !target.join("SKILL.md").is_file() {
+            continue;
+        }
+        if let Some(uuid) = source_uuid.as_deref() {
+            if record.uuid == uuid || read_skill_uuid(&target).as_deref() == Some(uuid) {
+                return Ok(true);
+            }
+        } else if directories_equal(&source_canonical, &target)? {
+            return Ok(true);
+        }
+    }
+
+    if let Some(uuid) = source_uuid.as_deref() {
+        if find_managed_skill_by_uuid(layout, uuid).is_some() {
+            return Ok(true);
+        }
+    }
+
+    let (name, _) = read_skill_metadata(&source_canonical);
+    let safe_name = sanitize_skill_dir_name(&name, &source_path_string);
+    let target = layout.skills.join(safe_name);
+    Ok(target.exists() && directories_equal(&source_canonical, &target)?)
 }
 
 fn read_skill_metadata(skill_dir: &Path) -> (String, String) {
@@ -1394,6 +1433,8 @@ pub fn discover_skills_in_directory(
     if !root.is_dir() {
         return Err("Discovery path must be a directory".to_string());
     }
+    let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
+    let layout = ensure_manager_layout(&home)?;
 
     let mut skills: Vec<DiscoveredSkill> = WalkDir::new(&root)
         .follow_links(false)
@@ -1406,7 +1447,12 @@ pub fn discover_skills_in_directory(
                     .to_str()
                     .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
         })
-        .map(|entry| inspect_discovered_skill(entry.path()))
+        .map(|entry| {
+            let mut skill = inspect_discovered_skill(entry.path());
+            skill.is_duplicate = is_managed_duplicate(Path::new(&skill.path), &layout)
+                .unwrap_or(false);
+            skill
+        })
         .collect();
 
     skills.sort_by(|left, right| {
@@ -1963,6 +2009,10 @@ mod tests {
         let repeated = import_skill_to_layout(&source, &layout);
         assert_eq!(repeated.status, "skipped");
         assert_eq!(repeated.target_path, imported.target_path);
+        assert!(
+            is_managed_duplicate(&source, &layout).expect("duplicate check should succeed"),
+            "an already imported source should be disabled during discovery"
+        );
 
         let first_scan =
             collect_skills_from_dir(&layout.skills, "manager", None).expect("first scan");

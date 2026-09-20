@@ -27,7 +27,7 @@ export function useSkillsManager() {
     string,
     { timestamp: number; data: SearchResponse }
   >();
-  const activeTab = ref<"local" | "import" | "packages" | "market" | "ide" | "projects" | "settings" | "trash">("local");
+  const activeTab = ref<"local" | "packages" | "market" | "ide" | "projects" | "settings" | "trash">("local");
 
   const query = ref("");
   const marketSource = ref<"cached" | "skillsmp">("cached");
