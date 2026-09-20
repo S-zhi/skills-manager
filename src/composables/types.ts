@@ -183,3 +183,25 @@ export type ProjectConfig = {
   ideTargets: string[];
   detectedIdeDirs: ProjectIdeDir[];
 };
+
+export type TranslationSettingsView = {
+  schemaVersion: number;
+  revision: number;
+  basic: {
+    provider: "azure" | "deepl" | "google" | "mymemory" | "libretranslate";
+    endpoint: string;
+    region: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+  };
+  advanced: {
+    provider: "gemini" | "openai-compatible";
+    baseUrl: string;
+    model: string;
+    temperature: number;
+    preserveStructure: boolean;
+  };
+  basicApiKeyConfigured: boolean;
+  advancedApiKeyConfigured: boolean;
+  configPath: string;
+};

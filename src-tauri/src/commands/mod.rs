@@ -6,4 +6,5 @@ pub mod market;
 pub mod packages;
 pub mod skills;
 pub mod skillsmp;
+pub mod translation_settings;
 pub mod trash;

@@ -17,6 +17,9 @@ use commands::skills::{
     uninstall_skill,
 };
 use commands::skillsmp::search_skillsmp;
+use commands::translation_settings::{
+    clear_translation_session_key, get_translation_settings, save_translation_settings,
+};
 use commands::trash::{
     list_trashed_skills, permanently_delete_trashed_skill, restore_trashed_skill,
 };
@@ -73,7 +76,10 @@ pub fn run() {
             delete_local_skills,
             export_local_skills,
             adopt_ide_skill,
-            scan_project_ide_dirs
+            scan_project_ide_dirs,
+            get_translation_settings,
+            save_translation_settings,
+            clear_translation_session_key
         ]);
 
     #[cfg(desktop)]
