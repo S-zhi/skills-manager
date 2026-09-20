@@ -61,15 +61,15 @@ Windows 使用随深浅色主题切换的简洁标题栏，显示名称为 **Ski
 [English](README.md) | [中文](README_zh-CN.md)
 
 **将 skill 快速安装到 全局/项目** 
-一款跨平台 AI Skills 管理器。支持搜索内置目录或 SkillsMP 在线目录，下载到统一的本地管理库，并通过符号链接（Symlink）安装到受支持的 AI 开发环境。支持 Windows、macOS 与 Linux。
+一款跨平台 AI Skills 管理器。支持检索 ClawHub、SkillsMP 和 skills.sh，下载到统一的本地管理库，并通过符号链接安装到受支持的 AI 开发环境。支持 Windows、macOS 与 Linux。
 
 ![Local](docs/screenshots/zh-CN/local.png)
-![Market](docs/screenshots/zh-CN/market.png)
+![Skill 商店](docs/screenshots/zh-CN/market.png)
 ![IDE](docs/screenshots/zh-CN/ide.png)
 
 ## ✨ 核心特性
 
-- 🔍 **聚合市场检索**：基于公开 Registry，一站式搜索全网优质 Skills
+- 🔍 **Skill 商店**：统一检索 ClawHub、SkillsMP 和 skills.sh
 - 📦 **统一本地仓库**：Windows 使用 `%USERPROFILE%\Skill Manager\Skills` 集中管理导入和下载的 Skill
 - 🔎 **发现与批量导入**：递归发现任意目录中的 `SKILL.md`，检查规范后可多选导入
 - 🚀 **一键极速分发**：以系统软链接形式，将统一的本地 Skills 秒级安装至各个目标 IDE
@@ -105,7 +105,7 @@ Windows 使用随深浅色主题切换的简洁标题栏，显示名称为 **Ski
 xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ```
 
-### 🔍 1) 市场浏览 (Market)
+### 🔍 1) Skill 商店
 
 - 基于配置好的服务源，聚合展示全网可用的优质 Skills。
 - 点击下载将自动入库至本地，若本地仓库已存在较旧版本，将高亮显示“更新”按钮。
@@ -236,17 +236,15 @@ npm run tauri build
 
 ## 📡 远程数据来源
 
-- **内置目录**：应用自带的 `src-tauri/data/skills-index.json`。刷新只会重新搜索，不会联网更新目录。
-- **SkillsMP 在线目录**：Rust 后端请求官方 `https://skillsmp.com/api/v1/skills/search`，无需浏览器跨域访问。第一版使用匿名接口，不需要登录或 API Key；暂不提供 Key 配置、高级筛选和 MCP 接入。
-- **文件下载**：根据结果的 GitHub 源地址，复用现有下载队列。Claude Plugins、SkillsLLM 尚未接入实时搜索，也不使用第三方 ZIP 代理。
+- **ClawHub**：匿名请求 `https://clawhub.ai/api/v1/search`；仅展示 ClawHub 原生记录，过滤其 skills.sh 镜像以避免重复。
+- **SkillsMP**：匿名请求官方 `https://skillsmp.com/api/v1/skills/search`，支持分页及每日剩余额度显示。
+- **skills.sh**：请求官方 CLI 使用的匿名兼容接口 `https://skills.sh/api/search`；该接口没有正式的稳定性或限流承诺。
 
-### 使用 SkillsMP 在线商店
-
-进入 **商店 → SkillsMP · 在线搜索**，输入 `pdf`、`frontend` 等关键词。不能空白搜索或使用 `*` 通配符。支持加载更多、单项下载、全选当前已加载结果并批量下载。批量下载跳过已导入项；已有 Skill 可通过单项“更新”操作更新。
+进入 **Skill 商店**，选择数据提供方并输入 `pdf`、`frontend` 等关键词。支持单项下载、全选当前结果及批量下载；已有 Skill 可执行更新。
 
 下载内容保存到 `Skill Manager/Skills`，在“我的 Skills”中管理。失败任务会在商店显示原因和重试按钮。源地址不受支持的结果仍展示，但禁用下载。
 
-SkillsMP 当前公布的匿名配额是每天 50 次、每分钟 10 次，实际以平台政策为准。页面显示最近一次请求返回的今日剩余配额；同一搜索的首页缓存 10 分钟，“刷新”绕过应用缓存重新请求。搜索词会发送至 SkillsMP，不发送本地 Skill 内容。网络异常或配额用尽会明确报错，不会悄悄切换到内置目录。接口总数可能是估算值，翻页以 `hasNext` 为准，每个搜索最多 50 页。
+SkillsMP 当前公布的匿名配额是每天 50 次、每分钟 10 次。搜索首页缓存 10 分钟，“刷新”会绕过缓存。检索词只发送至当前选中的提供方，不上传本地 Skill 内容；网络异常或配额用尽会明确报错，不会切换到其他数据源。
 
 下载前请检查来源、许可证及脚本内容；下载不会执行脚本，也不代表已完成安全审计。当前仍先下载 GitHub 仓库压缩包，再提取指定目录，压缩包最大 50 MiB。大型仓库可能超限，可单独获取所需 Skill 后本地导入。指定目录缺失或不含 `SKILL.md` 时停止导入，不会改为导入仓库中的其他目录。
 

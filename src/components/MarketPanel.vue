@@ -2,15 +2,15 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { RemoteSkill, DownloadTask } from "../composables/types";
+import type { RemoteSkill, DownloadTask, SkillStoreProvider } from "../composables/types";
 import ManualAddSkillModal from "./ManualAddSkillModal.vue";
 
 const { t, locale } = useI18n();
 
 const props = defineProps<{
   query: string;
-  marketSource: "cached" | "skillsmp";
-  marketError: string;
+  storeProvider: SkillStoreProvider;
+  storeError: string;
   dailyRemaining: number | null;
   loading: boolean;
   results: RemoteSkill[];
@@ -32,14 +32,14 @@ const selectable = computed(() => props.results.filter(skill => !!skill.sourceUr
 const selectedSkills = computed(() => selectable.value.filter(skill => selected.value.includes(skill.id)));
 const failedTasks = computed(() => props.downloadQueue.filter(task => task.status === "error"));
 watch(() => props.results, () => { selected.value = []; });
-watch(() => props.marketSource, () => { selected.value = []; });
+watch(() => props.storeProvider, () => { selected.value = []; });
 function downloadSelected() {
   for (const skill of selectedSkills.value) emit("download", skill);
   selected.value = [];
 }
 
 const emit = defineEmits<{
-  (e: "source", value: "cached" | "skillsmp"): void;
+  (e: "provider", value: SkillStoreProvider): void;
   (e: "retry", id: string): void;
   (e: "update:query", value: string): void;
   (e: "search"): void;
@@ -53,8 +53,9 @@ const emit = defineEmits<{
 const showManualAdd = ref(false);
 
 async function openSource(skill: RemoteSkill) {
-  if (!skill.sourceUrl?.trim()) return;
-  await openUrl(skill.sourceUrl.trim());
+  const url = skill.detailUrl?.trim() || skill.sourceUrl?.trim();
+  if (!url) return;
+  await openUrl(url);
 }
 </script>
 
@@ -64,15 +65,17 @@ async function openSource(skill: RemoteSkill) {
       <div class="panel-title">{{ t("market.title") }}</div>
     </div>
 
-    <div class="market-sources" role="group" :aria-label="text('搜索来源', 'Search source')">
-      <button type="button" class="ghost" :class="{ 'source-active': marketSource === 'cached' }" :aria-pressed="marketSource === 'cached'" :disabled="loading" @click="$emit('source', 'cached')">{{ text('内置目录', 'Built-in directory') }}</button>
-      <button type="button" class="ghost" :class="{ 'source-active': marketSource === 'skillsmp' }" :aria-pressed="marketSource === 'skillsmp'" :disabled="loading" @click="$emit('source', 'skillsmp')">SkillsMP · {{ text('在线搜索', 'Online') }}</button>
+    <div class="market-sources" role="group" :aria-label="text('数据提供方', 'Data provider')">
+      <button type="button" class="ghost" :class="{ 'source-active': storeProvider === 'clawhub' }" :aria-pressed="storeProvider === 'clawhub'" :disabled="loading" @click="$emit('provider', 'clawhub')">ClawHub</button>
+      <button type="button" class="ghost" :class="{ 'source-active': storeProvider === 'skillsmp' }" :aria-pressed="storeProvider === 'skillsmp'" :disabled="loading" @click="$emit('provider', 'skillsmp')">SkillsMP</button>
+      <button type="button" class="ghost" :class="{ 'source-active': storeProvider === 'skillssh' }" :aria-pressed="storeProvider === 'skillssh'" :disabled="loading" @click="$emit('provider', 'skillssh')">skills.sh</button>
     </div>
-    <p class="hint source-hint" v-if="marketSource === 'skillsmp'">
+    <p class="hint source-hint" v-if="storeProvider === 'skillsmp'">
       {{ text('无需登录。关键词会发送至 SkillsMP；匿名配额通常为 50 次/天、10 次/分钟。同一搜索缓存 10 分钟，“刷新”会重新请求。', 'No sign-in required. Keywords are sent to SkillsMP. Anonymous quota is normally 50/day, 10/min. Searches are cached for 10 minutes; Refresh requests fresh results.') }}
       <span v-if="dailyRemaining !== null">{{ text('最近请求返回的今日剩余次数：', 'Daily requests remaining at last response: ') }}{{ dailyRemaining }}</span>
     </p>
-    <p class="hint source-hint" v-else>{{ text('搜索应用内置索引；刷新不会从网络更新目录。', 'Search the bundled index; refreshing does not update it from the internet.') }}</p>
+    <p class="hint source-hint" v-else-if="storeProvider === 'clawhub'">{{ text('匿名检索 ClawHub 原生 Skill，并过滤镜像结果以避免与 skills.sh 重复。同一搜索缓存 10 分钟。', 'Search native ClawHub skills anonymously. Mirrored results are filtered to avoid skills.sh duplicates. Searches are cached for 10 minutes.') }}</p>
+    <p class="hint source-hint" v-else>{{ text('通过 skills.sh CLI 使用的匿名兼容接口检索；该接口没有正式的稳定性与限流承诺。', 'Search through the anonymous compatibility endpoint used by the skills.sh CLI. This endpoint has no formal stability or quota guarantee.') }}</p>
 
     <div class="search-row">
       <input
@@ -80,7 +83,7 @@ async function openSource(skill: RemoteSkill) {
         class="input"
         :placeholder="t('market.searchPlaceholder')"
         :aria-label="t('market.searchPlaceholder')"
-        :maxlength="marketSource === 'skillsmp' ? 200 : undefined"
+        :maxlength="200"
         :disabled="loading"
         @input="$emit('update:query', ($event.target as HTMLInputElement).value)"
         @keydown.enter.prevent="$emit('search')"
@@ -95,8 +98,8 @@ async function openSource(skill: RemoteSkill) {
         {{ t("market.manualAdd") }}
       </button>
     </div>
-    <p v-if="marketError" class="market-error" role="alert">{{ marketError }}</p>
-    <p v-if="marketSource === 'skillsmp'" class="hint source-hint">{{ text('下载进入“我的 Skills”，不执行外部脚本。请核查来源和许可证；大型 GitHub 仓库可能超出下载限制。', 'Downloads go to My Skills without executing scripts. Review the source and license; large GitHub repositories may exceed download limits.') }}</p>
+    <p v-if="storeError" class="market-error" role="alert">{{ storeError }}</p>
+    <p class="hint source-hint">{{ text('下载进入“我的 Skills”，不会执行外部脚本。请先核查来源、许可证及 Skill 内容。', 'Downloads go to My Skills without executing external scripts. Review the source, license, and skill contents first.') }}</p>
   </section>
 
   <section class="panel">
@@ -111,7 +114,7 @@ async function openSource(skill: RemoteSkill) {
       <button type="button" class="ghost" @click="$emit('retry', task.id)">{{ text('重试下载', 'Retry download') }}</button>
     </div>
     <div v-if="loading && results.length === 0" class="hint">{{ t("market.loadingHint") }}</div>
-    <div v-if="results.length === 0 && !loading && !marketError" class="hint">{{ marketSource === 'skillsmp' && !query.trim() ? text('输入关键词，开始搜索 SkillsMP。', 'Enter a keyword to search SkillsMP.') : t("market.emptyHint") }}</div>
+    <div v-if="results.length === 0 && !loading && !storeError" class="hint">{{ !query.trim() ? text('输入关键词并选择数据提供方开始检索。', 'Enter a keyword and choose a provider to search.') : t("market.emptyHint") }}</div>
 
     <div class="cards market-cards">
       <article v-for="skill in results" :key="skill.id" class="card">
@@ -162,12 +165,13 @@ async function openSource(skill: RemoteSkill) {
         </div>
         <p class="card-desc">{{ locale === 'zh-CN' && skill.descriptionZh ? skill.descriptionZh : skill.description }}</p>
         <div class="card-source">{{ t("market.source", { source: skill.marketLabel }) }}</div>
-        <div v-if="skill.marketId === 'skillsmp'" class="hint">GitHub Stars: {{ skill.stars.toLocaleString() }}</div>
+        <div v-if="skill.stars > 0" class="hint">Stars: {{ skill.stars.toLocaleString() }}</div>
+        <div v-if="skill.installs > 0" class="hint">{{ text('下载/安装：', 'Downloads/installs: ') }}{{ skill.installs.toLocaleString() }}</div>
         <div class="card-link">{{ skill.sourceUrl }}</div>
         <div class="card-actions market-card-actions">
           <button
             class="ghost"
-            :disabled="!skill.sourceUrl || !skill.sourceUrl.trim()"
+            :disabled="!(skill.detailUrl || skill.sourceUrl)"
             @click="openSource(skill)"
           >
             {{ t("market.viewSource") }}

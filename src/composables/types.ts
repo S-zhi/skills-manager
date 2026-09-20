@@ -6,6 +6,7 @@ export type RemoteSkill = {
   name: string;
   namespace: string;
   sourceUrl: string;
+  detailUrl: string;
   description: string;
   descriptionZh: string;
   author: string;
@@ -75,6 +76,8 @@ export type SkillPackageStore = {
   uncategorizedPosition: number;
   packages: SkillPackage[];
 };
+
+export type SkillStoreProvider = "clawhub" | "skillsmp" | "skillssh";
 
 /**
  * Skill found by recursively scanning a user-selected directory.

@@ -1,3 +1,4 @@
+pub mod clawhub;
 pub mod create_skill;
 pub mod github_sync;
 pub mod history;
@@ -6,5 +7,6 @@ pub mod market;
 pub mod packages;
 pub mod skills;
 pub mod skillsmp;
+pub mod skillssh;
 pub mod translation_settings;
 pub mod trash;

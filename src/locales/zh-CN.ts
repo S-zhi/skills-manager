@@ -28,7 +28,7 @@ export default {
     tabs: {
       local: "我的 Skills",
       discover: "发现与导入",
-      market: "Market",
+      store: "Skill 商店",
       ide: "IDE 浏览",
       settings: "设置"
     },
@@ -41,7 +41,7 @@ export default {
   },
   sidebar: {
     local: "本地技能",
-    market: "市场",
+    market: "Skill 商店",
     ide: "IDE 管理",
     settings: "设置",
     version: "版本",
@@ -77,7 +77,7 @@ export default {
     }
   },
   market: {
-    title: "商店检索",
+    title: "Skill 商店",
     searchPlaceholder: "输入关键字搜索技能...",
     search: "搜索",
     searching: "搜索中...",
@@ -122,7 +122,7 @@ export default {
     selectAll: "全选",
     searchPlaceholder: "搜索名称、描述或路径",
     scanning: "正在扫描本地 Skills...",
-    emptyHint: "暂无本地 Skill，请尝试从市场下载。",
+    emptyHint: "暂无本地 Skill，请尝试从 Skill 商店下载。",
     searchEmptyHint: "没有匹配的 Skill",
     install: "安装到编辑器",
     installSelected: "批量安装到编辑器 ({count})",
@@ -297,7 +297,7 @@ export default {
     install: "立即更新"
   },
   marketSettings: {
-    title: "市场管理",
+    title: "Skill 商店设置",
     online: "在线",
     unavailable: "暂不可用",
     needsKey: "需要 API Key",

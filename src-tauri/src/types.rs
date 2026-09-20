@@ -7,6 +7,7 @@ pub struct RemoteSkillView {
     pub name: String,
     pub namespace: String,
     pub source_url: String,
+    pub detail_url: String,
     pub description: String,
     pub description_zh: String,
     pub author: String,
@@ -23,6 +24,8 @@ pub struct RemoteSkillsViewResponse {
     pub total: u64,
     pub limit: u64,
     pub offset: u64,
+    pub has_next: bool,
+    pub daily_remaining: Option<u64>,
 }
 
 #[derive(Deserialize, Debug)]

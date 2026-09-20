@@ -52,16 +52,16 @@ Windows uses a compact, theme-aware title bar named **Skill Manager**. Drag the 
 [English](README.md) | [中文](README_zh-CN.md)
 
 **Quickly install skills to Global/Project**
-A cross-platform AI Skills Manager. Search the bundled directory or the live SkillsMP catalog, download skills into a unified local library, and install them into supported AI development environments via symlinks. Supports Windows, macOS and Linux.
+A cross-platform AI Skills Manager. Search ClawHub, SkillsMP, or skills.sh, download skills into a unified local library, and install them into supported AI development environments via symlinks. Supports Windows, macOS and Linux.
 
 ![Local](docs/screenshots/en-US/local.png)
-![Market](docs/screenshots/en-US/market.png)
+![Skill Store](docs/screenshots/en-US/market.png)
 ![IDE](docs/screenshots/en-US/ide.png)
 ![Project](docs/screenshots/en-US/project.png)
 
 ## ✨ Core Features
 
-- 🔍 **Aggregated Market Search**: Search quality skills from public registries in one place
+- 🔍 **Skill Store**: Search ClawHub, SkillsMP, and skills.sh from one place
 - 📦 **Unified Local Repository**: On Windows, imported and downloaded skills live in `%USERPROFILE%\Skill Manager\Skills`
 - 🔎 **Discovery & Batch Import**: Recursively find `SKILL.md` files, validate them, select multiple results, and import them
 - 🚀 **One-Click Installation**: Install unified local skills to target IDEs in seconds via symlinks
@@ -97,7 +97,7 @@ Since Apple developer commercial signature is not configured yet, opening the ap
 xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ```
 
-### 🔍 1) Market
+### 🔍 1) Skill Store
 
 - Aggregated display of available skills from configured data sources.
 - Clicking download automatically adds it to your local repository. If an older version exists, an "Update" button will be highlighted instead.
@@ -208,15 +208,13 @@ npm run tauri build
 
 ## 📡 Remote Data Sources
 
-- **Built-in directory**: bundled `src-tauri/data/skills-index.json`. Refresh reruns the search, not an online catalog update.
-- **SkillsMP online**: official `https://skillsmp.com/api/v1/skills/search`, called by the Rust backend. This first version uses anonymous access; no login or API key is needed. Key configuration, advanced filters and MCP integration are not included yet.
-- **Downloads**: use the returned GitHub source URL and existing download queue. Claude Plugins and SkillsLLM are not connected as live sources. No third-party ZIP proxy is used.
+- **ClawHub**: anonymous `https://clawhub.ai/api/v1/search`; only native ClawHub records are shown, while mirrored skills.sh entries are filtered out.
+- **SkillsMP**: anonymous official `https://skillsmp.com/api/v1/skills/search` with pagination and daily quota metadata.
+- **skills.sh**: anonymous compatibility `https://skills.sh/api/search`, the endpoint used by the official CLI. It has no formal stability or quota guarantee.
 
-### Using SkillsMP
+Open **Skill Store**, choose a provider, enter a keyword such as `pdf` or `frontend`, and search. Results can be downloaded individually or selected in batches. Already imported skills retain their Update button. Downloads appear in **My Skills** under `Skill Manager/Skills`; failed downloads can be retried in the Skill Store.
 
-Open **Marketplace → SkillsMP · Online**, enter a keyword such as `pdf` or `frontend`, and search. Empty/wildcard queries are not supported. Load more results and download individually or select loaded results for batch download. Already imported skills are excluded from batch download and retain their Update button. Downloads appear in **My Skills** under `Skill Manager/Skills`; failed downloads can be retried in the marketplace.
-
-Anonymous quotas are currently 50 requests/day and 10/minute (subject to platform policy). The page displays remaining daily requests as reported by the last response. Search first pages are cached for ten minutes; Refresh bypasses the application cache. Keywords are sent to SkillsMP; local Skill contents are not uploaded. Errors do not silently fall back to local results. Pagination uses the API's `hasNext`, not its potentially approximate total, up to 50 pages per query.
+SkillsMP anonymous quotas are currently 50 requests/day and 10/minute (subject to platform policy). Search first pages are cached for ten minutes; Refresh bypasses the application cache. Queries are sent only to the selected provider; local Skill contents are not uploaded, and provider errors never fall back to another source.
 
 Results show descriptions, authors, GitHub stars and source links. Unsupported URLs remain visible with downloading disabled. Review source, license and scripts before use; downloading does not execute scripts or certify safety. Downloads still fetch the repository ZIP first (maximum 50 MiB), then extract the selected directory. For large repositories, obtain the desired Skill separately and use local import. Missing linked directories or missing `SKILL.md` produce an error instead of importing unrelated content.
 

@@ -7,7 +7,8 @@ import { useToast } from "./useToast";
 import type {
   RemoteSkill, InstallResult, LocalSkill,
   IdeSkill, Overview, LinkTarget, DownloadTask, DiscoveredSkill,
-  ManagerStorageInfo, BatchImportResult, SkillImportItemResult, IdeBrowseLocation
+  ManagerStorageInfo, BatchImportResult, SkillImportItemResult, IdeBrowseLocation,
+  SkillStoreProvider
 } from "./types";
 import { useIdeConfig } from "./useIdeConfig";
 import {
@@ -26,11 +27,11 @@ export function useSkillsManager() {
     string,
     { timestamp: number; data: SearchResponse }
   >();
-  const activeTab = ref<"local" | "market" | "ide" | "settings" | "trash">("local");
+  const activeTab = ref<"local" | "store" | "ide" | "settings" | "trash">("local");
 
   const query = ref("");
-  const marketSource = ref<"cached" | "skillsmp">("cached");
-  const marketError = ref("");
+  const storeProvider = ref<SkillStoreProvider>("clawhub");
+  const storeError = ref("");
   const dailyRemaining = ref<number | null>(null);
   const onlineHasMore = ref(false);
   let lastSearchKey = "";
@@ -80,7 +81,7 @@ export function useSkillsManager() {
   const busyText = ref("");
   const recentTaskStatus = ref<Record<string, "download" | "update">>({});
 
-  const hasMore = computed(() => marketSource.value === "skillsmp" ? onlineHasMore.value : offset.value + limit.value < total.value);
+  const hasMore = computed(() => onlineHasMore.value);
   const sortedResults = computed(() => results.value);
   const localSkillSourceSet = computed(() => {
     const set = new Set<string>();
@@ -193,21 +194,24 @@ export function useSkillsManager() {
     ];
   }
 
-  async function searchMarketplace(reset = true, force = false) {
+  async function searchSkillStore(reset = true, force = false) {
     if (loading.value) return;
-    const source = marketSource.value;
+    const source = storeProvider.value;
     const keyword = query.value.trim();
     const cacheKey = `${source}|${keyword}|${limit.value}`;
     if (cacheKey !== lastSearchKey) reset = true;
-    marketError.value = "";
+    storeError.value = "";
     if (reset) {
       results.value = [];
       total.value = 0;
       offset.value = 0;
       onlineHasMore.value = false;
     }
-    if (source === "skillsmp" && (!keyword || keyword.includes('*') || [...keyword].length > 200)) {
-      marketError.value = "SkillsMP：请输入 1–200 个字符的关键词，不支持 * / Enter a keyword (1–200 characters), not a wildcard.";
+    const minLength = source === "skillssh" ? 2 : 1;
+    if ([...keyword].length < minLength || [...keyword].length > 200 || (source === "skillsmp" && keyword.includes('*'))) {
+      storeError.value = source === "skillssh"
+        ? "skills.sh：请输入 2–200 个字符的关键词 / Enter a keyword with at least 2 characters."
+        : "请输入 1–200 个字符的关键词；SkillsMP 不支持 * / Enter a keyword (1–200 characters).";
       return;
     }
     loading.value = true;
@@ -229,7 +233,12 @@ export function useSkillsManager() {
     }
 
     try {
-      const data = await invoke<SearchResponse>(source === "skillsmp" ? "search_skillsmp" : "search_marketplaces", {
+      const command: Record<SkillStoreProvider, string> = {
+        clawhub: "search_clawhub",
+        skillsmp: "search_skillsmp",
+        skillssh: "search_skillssh"
+      };
+      const data = await invoke<SearchResponse>(command[source], {
         query: keyword,
         limit: limit.value,
         offset: nextOffset
@@ -252,8 +261,8 @@ export function useSkillsManager() {
         });
       }
     } catch (err) {
-      marketError.value = getErrorMessage(err, t("errors.searchFailed"));
-      toast.error(marketError.value);
+      storeError.value = getErrorMessage(err, t("errors.searchFailed"));
+      toast.error(storeError.value);
     } finally {
       loading.value = false;
     }
@@ -378,17 +387,17 @@ export function useSkillsManager() {
     );
   }
 
-  function setMarketSource(source: "cached" | "skillsmp") {
-    if (loading.value || source === marketSource.value) return;
-    marketSource.value = source;
+  function setStoreProvider(source: SkillStoreProvider) {
+    if (loading.value || source === storeProvider.value) return;
+    storeProvider.value = source;
     results.value = [];
     total.value = 0;
     offset.value = 0;
     onlineHasMore.value = false;
     dailyRemaining.value = null;
-    marketError.value = "";
+    storeError.value = "";
     lastSearchKey = "";
-    if (source === "cached" || query.value.trim()) void searchMarketplace(true);
+    if (query.value.trim()) void searchSkillStore(true);
   }
 
   async function updateLocalSkill(skill: LocalSkill) {
@@ -404,6 +413,7 @@ export function useSkillsManager() {
         name: skill.name,
         namespace: "local",
         sourceUrl,
+        detailUrl: sourceUrl,
         description: skill.description,
         descriptionZh: "",
         author: "",
@@ -443,6 +453,7 @@ export function useSkillsManager() {
       name: resolvedName,
       namespace: "manual",
       sourceUrl: parsed.normalizedUrl,
+      detailUrl: parsed.normalizedUrl,
       description: t("market.manualDescription"),
       descriptionZh: "",
       author: parsed.kind === "zip" ? t("market.manualSourceLabel") : "",
@@ -818,7 +829,6 @@ export function useSkillsManager() {
   onMounted(() => {
     refreshIdeOptions();
     void loadManagerStorage();
-    void searchMarketplace(true);
     void scanLocalSkills();
   });
 
@@ -866,11 +876,11 @@ export function useSkillsManager() {
     refreshIdeOptions,
     addCustomIde,
     removeCustomIde,
-    searchMarketplace,
-    marketSource,
-    marketError,
+    searchSkillStore,
+    storeProvider,
+    storeError,
     dailyRemaining,
-    setMarketSource,
+    setStoreProvider,
     downloadSkill,
     updateSkill,
     updateLocalSkill,

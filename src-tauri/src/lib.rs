@@ -2,13 +2,14 @@ mod commands;
 mod types;
 mod utils;
 
+use commands::clawhub::search_clawhub;
 use commands::create_skill::create_local_skill;
 use commands::github_sync::{
     github_sync_status, save_github_sync, sync_github_now, test_github_sync,
 };
 use commands::history::{list_skill_history, restore_skill_history};
 use commands::library_metadata::{get_skill_library_metadata, save_skill_library_entry};
-use commands::market::{download_marketplace_skill, search_marketplaces, update_marketplace_skill};
+use commands::market::{download_marketplace_skill, update_marketplace_skill};
 use commands::packages::{
     assign_skill_package_members, delete_skill_package, list_skill_packages,
     reorder_skill_packages, save_skill_package,
@@ -19,6 +20,7 @@ use commands::skills::{
     link_local_skill, read_local_skill_preview, save_local_skill, scan_overview, uninstall_skill,
 };
 use commands::skillsmp::search_skillsmp;
+use commands::skillssh::search_skillssh;
 use commands::translation_settings::{
     clear_translation_session_key, get_translation_settings, save_translation_settings,
 };
@@ -64,8 +66,9 @@ pub fn run() {
             delete_skill_package,
             assign_skill_package_members,
             reorder_skill_packages,
-            search_marketplaces,
+            search_clawhub,
             search_skillsmp,
+            search_skillssh,
             download_marketplace_skill,
             update_marketplace_skill,
             link_local_skill,

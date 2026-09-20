@@ -28,7 +28,7 @@ export default {
     tabs: {
       local: "My Skills",
       discover: "Discover & Import",
-      market: "Market",
+      store: "Skill Store",
       ide: "IDE Browser",
       settings: "Settings"
     },
@@ -41,7 +41,7 @@ export default {
   },
   sidebar: {
     local: "Local Skills",
-    market: "Market",
+    market: "Skill Store",
     ide: "IDE Management",
     settings: "Settings",
     version: "Version",
@@ -77,7 +77,7 @@ export default {
     }
   },
   market: {
-    title: "Marketplace Search",
+    title: "Skill Store",
     searchPlaceholder: "Search skills (name / description / author)",
     search: "Search",
     searching: "Searching...",
@@ -123,7 +123,7 @@ export default {
     selectAll: "Select all",
     searchPlaceholder: "Search name, description or path",
     scanning: "Scanning local skills...",
-    emptyHint: "No local skills found. Try downloading some from the Market.",
+    emptyHint: "No local skills found. Try downloading some from the Skill Store.",
     searchEmptyHint: "No matching skills",
     install: "Install to IDE",
     installSelected: "Batch install to IDE ({count})",
@@ -298,7 +298,7 @@ export default {
     install: "Update Now"
   },
   marketSettings: {
-    title: "Market Settings",
+    title: "Skill Store Settings",
     online: "Online",
     unavailable: "Unavailable",
     needsKey: "Needs API Key",

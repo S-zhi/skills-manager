@@ -66,10 +66,10 @@ watch(theme, (next) => {
 const {
   activeTab,
   query,
-  marketSource,
-  marketError,
+  storeProvider,
+  storeError,
   dailyRemaining,
-  setMarketSource,
+  setStoreProvider,
   sortedResults,
   loading,
   installingId,
@@ -97,7 +97,7 @@ const {
   busyText,
   hasMore,
   localSkillSourceSet,
-  searchMarketplace,
+  searchSkillStore,
   downloadSkill,
   updateSkill,
   updateLocalSkill,
@@ -153,10 +153,10 @@ function closeImportSkillModal() {
         </button>
         <button
           class="tab"
-          :class="{ active: activeTab === 'market' }"
-          @click="activeTab = 'market'"
+          :class="{ active: activeTab === 'store' }"
+          @click="activeTab = 'store'"
         >
-          <AppIcon name="market" />{{ t("app.tabs.market") }}
+          <AppIcon name="market" />{{ t("app.tabs.store") }}
         </button>
         <button
           class="tab"
@@ -239,13 +239,13 @@ function closeImportSkillModal() {
         />
       </template>
 
-      <template v-else-if="activeTab === 'market'">
+      <template v-else-if="activeTab === 'store'">
         <MarketPanel
           v-model:query="query"
-          :market-source="marketSource"
-          :market-error="marketError"
+          :store-provider="storeProvider"
+          :store-error="storeError"
           :daily-remaining="dailyRemaining"
-          @source="setMarketSource"
+          @provider="setStoreProvider"
           @retry="retryDownload"
           :loading="loading"
           :results="sortedResults"
@@ -255,9 +255,9 @@ function closeImportSkillModal() {
           :local-skill-source-set="localSkillSourceSet"
           :download-queue="downloadQueue"
           :recent-task-status="recentTaskStatus"
-          @search="searchMarketplace(true)"
-          @refresh="searchMarketplace(true, true)"
-          @loadMore="searchMarketplace(false)"
+          @search="searchSkillStore(true)"
+          @refresh="searchSkillStore(true, true)"
+          @loadMore="searchSkillStore(false)"
           @download="downloadSkill"
           @update="updateSkill"
           @manual-add="({ sourceUrl, name }) => addManualSkill(sourceUrl, name)"

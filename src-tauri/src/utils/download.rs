@@ -193,6 +193,12 @@ fn parse_download_source(source_url: &str) -> Result<DownloadSource, String> {
         return Ok(github);
     }
 
+    if is_supported_clawhub_download_url(trimmed) {
+        return Ok(DownloadSource::ZipUrl {
+            url: trimmed.to_string(),
+        });
+    }
+
     if is_supported_zip_url(trimmed) {
         return Ok(DownloadSource::ZipUrl {
             url: trimmed.to_string(),
@@ -200,6 +206,18 @@ fn parse_download_source(source_url: &str) -> Result<DownloadSource, String> {
     }
 
     Err("仅支持 GitHub 仓库链接、GitHub 子目录链接或 ZIP 下载链接".to_string())
+}
+
+fn is_supported_clawhub_download_url(url: &str) -> bool {
+    let Some(slug) = url.strip_prefix("https://clawhub.ai/api/v1/download?slug=") else {
+        return false;
+    };
+    !slug.is_empty()
+        && slug.len() <= 128
+        && !slug.contains(['&', '#', '?', '/', '\\'])
+        && slug
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || "-_.%".contains(ch))
 }
 
 fn parse_github_source(source_url: &str) -> Result<Option<DownloadSource>, String> {
@@ -519,6 +537,23 @@ mod tests {
                 url: "https://example.com/files/skill-pack.zip?download=1".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn parses_exact_clawhub_download_url() {
+        let parsed =
+            parse_download_source("https://clawhub.ai/api/v1/download?slug=react-best-practices")
+                .unwrap();
+        assert_eq!(
+            parsed,
+            DownloadSource::ZipUrl {
+                url: "https://clawhub.ai/api/v1/download?slug=react-best-practices".to_string(),
+            }
+        );
+        assert!(parse_download_source(
+            "https://clawhub.ai/api/v1/download?slug=react&redirect=https://evil.test"
+        )
+        .is_err());
     }
 
     #[test]

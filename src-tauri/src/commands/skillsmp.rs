@@ -46,6 +46,8 @@ struct OnlineSkill {
     #[serde(default)]
     github_url: String,
     #[serde(default)]
+    skill_url: String,
+    #[serde(default)]
     stars: u64,
 }
 
@@ -117,6 +119,7 @@ fn parse_response(
             } else {
                 String::new()
             },
+            detail_url: item.skill_url,
             description: item.description,
             description_zh: String::new(),
             namespace: String::new(),
@@ -242,7 +245,7 @@ mod tests {
     }
 
     fn fixture() -> serde_json::Value {
-        json!({"success":true,"data":{"skills":[{"id":"demo","name":"PDF","author":"alice","description":"PDF tools","githubUrl":"https://github.com/alice/skills/tree/main/pdf","stars":12}],"pagination":{"page":1,"limit":20,"total":1,"hasNext":true,"totalIsExact":false}}})
+        json!({"success":true,"data":{"skills":[{"id":"demo","name":"PDF","author":"alice","description":"PDF tools","githubUrl":"https://github.com/alice/skills/tree/main/pdf","skillUrl":"https://skillsmp.com/creators/alice/skills/pdf","stars":12}],"pagination":{"page":1,"limit":20,"total":1,"hasNext":true,"totalIsExact":false}}})
     }
     #[test]
     fn maps_online_results_and_uses_has_next_instead_of_estimated_total() {
@@ -254,6 +257,10 @@ mod tests {
             "https://github.com/alice/skills/tree/main/pdf"
         );
         assert_eq!(result.skills[0].stars, 12);
+        assert_eq!(
+            result.skills[0].detail_url,
+            "https://skillsmp.com/creators/alice/skills/pdf"
+        );
         assert_eq!(result.daily_remaining, Some(49));
     }
     #[test]
