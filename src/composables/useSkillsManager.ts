@@ -6,7 +6,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useToast } from "./useToast";
 import type {
   RemoteSkill, InstallResult, LocalSkill,
-  IdeSkill, Overview, LinkTarget, DownloadTask, ProjectConfig
+  IdeSkill, Overview, LinkTarget, DownloadTask, ProjectConfig, DiscoveredSkill
 } from "./types";
 import { buildProjectLinkTargets } from "./projectTargets";
 import { useIdeConfig } from "./useIdeConfig";
@@ -41,6 +41,9 @@ export function useSkillsManager() {
   const localSkills = ref<LocalSkill[]>([]);
   const ideSkills = ref<IdeSkill[]>([]);
   const localLoading = ref(false);
+  const discoveredSkills = ref<DiscoveredSkill[]>([]);
+  const discoveryRoot = ref("");
+  const discoveryLoading = ref(false);
 
   // Download Queue
   const downloadQueue = ref<DownloadTask[]>([]);
@@ -698,6 +701,34 @@ export function useSkillsManager() {
     }
   }
 
+  async function discoverSkillsInDirectory() {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: t("local.selectDiscoveryDir")
+      });
+      if (!selected || Array.isArray(selected)) return;
+
+      discoveryLoading.value = true;
+      discoveryRoot.value = selected;
+      discoveredSkills.value = [];
+      discoveredSkills.value = await invoke<DiscoveredSkill[]>("discover_skills_in_directory", {
+        request: { rootPath: selected }
+      });
+    } catch (err) {
+      toast.error(getErrorMessage(err, t("errors.discoveryFailed")));
+    } finally {
+      discoveryLoading.value = false;
+    }
+  }
+
+  function clearDiscoveredSkills() {
+    discoveredSkills.value = [];
+    discoveryRoot.value = "";
+  }
+
   async function exportLocalSkills(skills: LocalSkill[]) {
     if (skills.length === 0) return;
 
@@ -827,6 +858,9 @@ export function useSkillsManager() {
     localSkills,
     ideSkills,
     localLoading,
+    discoveredSkills,
+    discoveryRoot,
+    discoveryLoading,
     ideOptions,
     selectedIdeFilter,
     customIdeName,
@@ -867,6 +901,8 @@ export function useSkillsManager() {
     confirmUninstall,
     cancelUninstall,
     importLocalSkill,
+    discoverSkillsInDirectory,
+    clearDiscoveredSkills,
     exportLocalSkills,
     openSkillDirectory,
     adoptIdeSkill,

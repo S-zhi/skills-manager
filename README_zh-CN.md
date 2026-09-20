@@ -57,6 +57,37 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 - 集中俯瞰已下载到设备底层仓库的所有 Skills。
 - 点击“安装”，即可在弹出的面板中勾选一个或多个原生 / 自定义的 IDE 实施批量挂载发布。
 
+#### Windows：递归发现目录中的 Skills
+
+在“已有 Skills”页面点击“发现目录中的 Skills”，选择任意 Windows 文件夹后，应用会递归查找该目录及所有子目录中的 `SKILL.md`。扫描是只读操作：不会复制、移动或修改发现到的文件，也不会自动将其加入 Skills Manager 本地仓库。
+
+发现结果会显示 Skill 来源。应用会根据路径识别通用 `.agents/skills`，以及 Codex、Claude Code、Cursor、Gemini/Antigravity、VS Code/GitHub Copilot、Windsurf、Qoder、Trae、Kiro、CodeBuddy、OpenClaw 和 OpenCode 等 Agent CLI 的 Skill 目录；无法判断来源时显示为通用 `SKILL.md`。
+
+每个结果都会标记是否为“规范 Agent Skill”。当前检查规则为：
+
+- 文件包含以 `---` 开始和结束的 YAML frontmatter；
+- frontmatter 包含非空的 `name` 和 `description`；
+- `name` 长度为 1–64，只包含小写字母、数字和单连字符，连字符不位于首尾；
+- `name` 与 Skill 目录名一致；
+- `description` 不超过 1024 个字符。
+
+只要存在 `SKILL.md` 就会展示，因此 Agent CLI 自定义的兼容 Skill 即使不满足上述规范也不会被隐藏；界面会列出具体的不规范原因。
+
+#### 本地仓库与复制行为
+
+Skills Manager 自己维护统一仓库：Windows 上为 `%USERPROFILE%\.skills-manager\skills`（其他系统为 `~/.skills-manager/skills`）。不同操作的文件行为如下：
+
+| 操作 | 是否复制到统一仓库 | 说明 |
+| --- | --- | --- |
+| 发现目录中的 Skills | 否 | 只读递归扫描并显示规范状态 |
+| 导入本地 Skill | 是 | 将用户选中的单个 Skill 目录复制到统一仓库 |
+| 纳入统一管理 | 是 | 先复制 IDE 中的 Skill 到统一仓库，再用链接替换原目录 |
+| 从市场下载 | 是 | 下载并解压到统一仓库 |
+| 安装到 IDE | 通常否 | 优先创建符号链接；Windows 下失败时使用目录联接 |
+| Windows 安装到 Qoder | 是 | Qoder 目标使用副本，并写入 `.skills-manager-source` 来源标记 |
+
+目录发现与导入是两个独立动作。本阶段不会在发现后自动复制；需要纳入管理时仍使用“导入本地 Skill”或 IDE 页面的“纳入统一管理”。
+
 ### ⌨️ 3) IDE 纬度管理 (IDE Browse)
 
 - 灵活切换工作环境视角（如 VSCode 或 Cursor），独立查看各自已挂载使用的技能列表。

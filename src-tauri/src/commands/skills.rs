@@ -1,7 +1,8 @@
 use crate::types::{
-    AdoptIdeSkillRequest, DeleteLocalSkillRequest, ExportSkillsRequest, IdeSkill, ImportRequest,
-    InstallResult, LinkRequest, LocalScanRequest, LocalSkill, LocalSkillPreview, Overview,
-    ProjectIdeDir, ProjectScanRequest, ProjectScanResult, UninstallRequest,
+    AdoptIdeSkillRequest, DeleteLocalSkillRequest, DiscoveredSkill, ExportSkillsRequest, IdeSkill,
+    ImportRequest, InstallResult, LinkRequest, LocalScanRequest, LocalSkill, LocalSkillPreview,
+    Overview, ProjectIdeDir, ProjectScanRequest, ProjectScanResult, SkillDiscoveryRequest,
+    UninstallRequest,
 };
 use crate::utils::download::copy_dir_recursive;
 use crate::utils::path::{normalize_path, resolve_canonical, sanitize_skill_dir_name};
@@ -16,6 +17,195 @@ use zip::{CompressionMethod, ZipWriter};
 
 const MANAGED_COPY_MARKER: &str = ".skills-manager-source";
 const MARKET_SKILL_METADATA: &str = ".skills-manager.json";
+
+const ISSUE_MISSING_FRONTMATTER: &str = "missing_frontmatter";
+const ISSUE_MISSING_NAME: &str = "missing_name";
+const ISSUE_INVALID_NAME: &str = "invalid_name";
+const ISSUE_MISSING_DESCRIPTION: &str = "missing_description";
+const ISSUE_DESCRIPTION_TOO_LONG: &str = "description_too_long";
+const ISSUE_DIRECTORY_NAME_MISMATCH: &str = "directory_name_mismatch";
+
+#[derive(Default)]
+struct SkillDocumentMetadata {
+    name: Option<String>,
+    description: Option<String>,
+    has_frontmatter: bool,
+}
+
+fn unquote_yaml_scalar(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.len() >= 2 {
+        let first = trimmed.as_bytes()[0];
+        let last = trimmed.as_bytes()[trimmed.len() - 1];
+        if (first == b'\'' && last == b'\'') || (first == b'"' && last == b'"') {
+            return trimmed[1..trimmed.len() - 1].trim().to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+fn parse_skill_document(content: &str) -> SkillDocumentMetadata {
+    let normalized = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let lines: Vec<&str> = normalized.lines().collect();
+    if lines.first().map(|line| line.trim()) != Some("---") {
+        return SkillDocumentMetadata::default();
+    }
+
+    let Some(end) = lines
+        .iter()
+        .enumerate()
+        .skip(1)
+        .find_map(|(idx, line)| (line.trim() == "---").then_some(idx))
+    else {
+        return SkillDocumentMetadata::default();
+    };
+
+    let mut metadata = SkillDocumentMetadata {
+        has_frontmatter: true,
+        ..SkillDocumentMetadata::default()
+    };
+    let frontmatter = &lines[1..end];
+    let mut index = 0usize;
+    while index < frontmatter.len() {
+        let line = frontmatter[index];
+        let trimmed = line.trim();
+        if line.chars().next().is_some_and(char::is_whitespace)
+            || trimmed.starts_with('#')
+            || trimmed.is_empty()
+        {
+            index += 1;
+            continue;
+        }
+
+        let Some((key, raw_value)) = trimmed.split_once(':') else {
+            index += 1;
+            continue;
+        };
+        let key = key.trim();
+        let raw_value = raw_value.trim();
+        if key == "name" {
+            metadata.name = Some(unquote_yaml_scalar(raw_value));
+        } else if key == "description" {
+            if raw_value == ">" || raw_value == "|" || raw_value == ">-" || raw_value == "|-" {
+                let mut parts = Vec::new();
+                index += 1;
+                while index < frontmatter.len() {
+                    let block_line = frontmatter[index];
+                    if !block_line
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_whitespace)
+                        && !block_line.trim().is_empty()
+                    {
+                        index -= 1;
+                        break;
+                    }
+                    let value = block_line.trim();
+                    if !value.is_empty() {
+                        parts.push(value);
+                    }
+                    index += 1;
+                }
+                metadata.description = Some(parts.join(" "));
+            } else {
+                metadata.description = Some(unquote_yaml_scalar(raw_value));
+            }
+        }
+        index += 1;
+    }
+
+    metadata
+}
+
+fn is_standard_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && !name.contains("--")
+        && name
+            .bytes()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == b'-')
+}
+
+fn detect_skill_provider(skill_dir: &Path) -> String {
+    let normalized = skill_dir
+        .to_string_lossy()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let providers = [
+        ("/.claude/", "Claude Code"),
+        ("/.codex/", "Codex"),
+        ("/.cursor/", "Cursor"),
+        ("/.gemini/", "Gemini / Antigravity"),
+        ("/.github/skills/", "VS Code / GitHub Copilot"),
+        ("/.windsurf/", "Windsurf"),
+        ("/.qoder/", "Qoder"),
+        ("/.trae/", "Trae"),
+        ("/.kiro/", "Kiro"),
+        ("/.codebuddy/", "CodeBuddy"),
+        ("/.openclaw/", "OpenClaw"),
+        ("/.opencode/", "OpenCode"),
+        ("/.agents/skills/", "Agent Skills"),
+    ];
+
+    providers
+        .iter()
+        .find_map(|(pattern, label)| normalized.contains(pattern).then_some((*label).to_string()))
+        .unwrap_or_else(|| "Generic SKILL.md".to_string())
+}
+
+fn inspect_discovered_skill(skill_md_path: &Path) -> DiscoveredSkill {
+    let skill_dir = skill_md_path.parent().unwrap_or(skill_md_path);
+    let directory_name = skill_dir
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("skill")
+        .to_string();
+    let raw = fs::read(skill_md_path).unwrap_or_default();
+    let content = String::from_utf8_lossy(&raw);
+    let metadata = parse_skill_document(&content);
+    let name = metadata
+        .name
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| directory_name.clone());
+    let description = metadata.description.clone().unwrap_or_default();
+    let mut issues = Vec::new();
+
+    if !metadata.has_frontmatter {
+        issues.push(ISSUE_MISSING_FRONTMATTER.to_string());
+    }
+    match metadata.name.as_deref().map(str::trim) {
+        None | Some("") => issues.push(ISSUE_MISSING_NAME.to_string()),
+        Some(value) => {
+            if !is_standard_skill_name(value) {
+                issues.push(ISSUE_INVALID_NAME.to_string());
+            }
+            if directory_name != value {
+                issues.push(ISSUE_DIRECTORY_NAME_MISMATCH.to_string());
+            }
+        }
+    }
+    match metadata.description.as_deref().map(str::trim) {
+        None | Some("") => issues.push(ISSUE_MISSING_DESCRIPTION.to_string()),
+        Some(value) if value.chars().count() > 1024 => {
+            issues.push(ISSUE_DESCRIPTION_TOO_LONG.to_string())
+        }
+        Some(_) => {}
+    }
+
+    DiscoveredSkill {
+        id: skill_dir.display().to_string(),
+        name,
+        description,
+        path: skill_dir.display().to_string(),
+        skill_md_path: skill_md_path.display().to_string(),
+        provider: detect_skill_provider(skill_dir),
+        is_standard: issues.is_empty(),
+        issues,
+    }
+}
 
 fn read_skill_metadata(skill_dir: &Path) -> (String, String) {
     let name = skill_dir
@@ -727,6 +917,40 @@ pub fn import_local_skill(request: ImportRequest) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn discover_skills_in_directory(
+    request: SkillDiscoveryRequest,
+) -> Result<Vec<DiscoveredSkill>, String> {
+    let root = PathBuf::from(&request.root_path);
+    if !root.exists() {
+        return Err("Discovery directory does not exist".to_string());
+    }
+    if !root.is_dir() {
+        return Err("Discovery path must be a directory".to_string());
+    }
+
+    let mut skills: Vec<DiscoveredSkill> = WalkDir::new(&root)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.file_type().is_file()
+                && entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
+        })
+        .map(|entry| inspect_discovered_skill(entry.path()))
+        .collect();
+
+    skills.sort_by(|left, right| {
+        left.path
+            .to_ascii_lowercase()
+            .cmp(&right.path.to_ascii_lowercase())
+    });
+    Ok(skills)
+}
+
+#[tauri::command]
 pub fn adopt_ide_skill(request: AdoptIdeSkillRequest) -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Unable to determine the home directory".to_string())?;
     let normalized_home = normalize_path(&home);
@@ -951,4 +1175,73 @@ pub fn scan_project_ide_dirs(request: ProjectScanRequest) -> Result<ProjectScanR
         project_dir: request.project_dir,
         detected_ide_dirs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_dir(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("skills-manager-{label}-{unique}"))
+    }
+
+    #[test]
+    fn validates_agent_skills_frontmatter() {
+        let metadata = parse_skill_document(
+            "---\nname: sample-skill\ndescription: A useful sample skill.\n---\n# Sample\n",
+        );
+        assert!(metadata.has_frontmatter);
+        assert_eq!(metadata.name.as_deref(), Some("sample-skill"));
+        assert_eq!(
+            metadata.description.as_deref(),
+            Some("A useful sample skill.")
+        );
+        assert!(is_standard_skill_name("sample-skill"));
+        assert!(!is_standard_skill_name("Sample Skill"));
+    }
+
+    #[test]
+    fn recursively_discovers_standard_and_compatible_skills() {
+        let root = test_dir("discovery");
+        let standard_dir = root.join(".codex/skills/standard-skill");
+        let compatible_dir = root.join("tools/custom-skill");
+        fs::create_dir_all(&standard_dir).expect("create standard directory");
+        fs::create_dir_all(&compatible_dir).expect("create compatible directory");
+        fs::write(
+            standard_dir.join("SKILL.md"),
+            "---\nname: standard-skill\ndescription: Standard metadata.\n---\n",
+        )
+        .expect("write standard skill");
+        fs::write(compatible_dir.join("SKILL.md"), "# Custom CLI skill\n")
+            .expect("write compatible skill");
+
+        let result = discover_skills_in_directory(SkillDiscoveryRequest {
+            root_path: root.display().to_string(),
+        })
+        .expect("discovery should succeed");
+
+        assert_eq!(result.len(), 2);
+        let standard = result
+            .iter()
+            .find(|skill| skill.name == "standard-skill")
+            .expect("standard skill should be found");
+        assert!(standard.is_standard);
+        assert_eq!(standard.provider, "Codex");
+
+        let compatible = result
+            .iter()
+            .find(|skill| skill.name == "custom-skill")
+            .expect("compatible skill should be found");
+        assert!(!compatible.is_standard);
+        assert!(compatible
+            .issues
+            .contains(&ISSUE_MISSING_FRONTMATTER.to_string()));
+
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
 }

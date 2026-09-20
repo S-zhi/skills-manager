@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import type { LocalSkill, LocalSkillPreview, DownloadTask, IdeOption } from "../composables/types";
+import type {
+  DiscoveredSkill,
+  LocalSkill,
+  LocalSkillPreview,
+  DownloadTask,
+  IdeOption
+} from "../composables/types";
 import DownloadQueue from "./DownloadQueue.vue";
 import SkillPreviewModal from "./SkillPreviewModal.vue";
 import { useI18n } from "vue-i18n";
@@ -17,6 +23,9 @@ const props = defineProps<{
   installingId: string | null;
   downloadQueue: DownloadTask[];
   ideOptions: IdeOption[];
+  discoveredSkills: DiscoveredSkill[];
+  discoveryRoot: string;
+  discoveryLoading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +38,8 @@ const emit = defineEmits<{
   (e: "openDir", path: string): void;
   (e: "refresh"): void;
   (e: "import"): void;
+  (e: "discover"): void;
+  (e: "clearDiscovery"): void;
   (e: "retryDownload", taskId: string): void;
   (e: "removeFromQueue", taskId: string): void;
 }>();
@@ -95,6 +106,18 @@ function buildIdeBadgeList(skill: LocalSkill) {
     label: option.label,
     active: skill.usedBy.includes(option.label)
   }));
+}
+
+function discoveryIssueLabel(issue: string) {
+  const knownIssues: Record<string, string> = {
+    missing_frontmatter: t("local.discoveryIssues.missingFrontmatter"),
+    missing_name: t("local.discoveryIssues.missingName"),
+    invalid_name: t("local.discoveryIssues.invalidName"),
+    missing_description: t("local.discoveryIssues.missingDescription"),
+    description_too_long: t("local.discoveryIssues.descriptionTooLong"),
+    directory_name_mismatch: t("local.discoveryIssues.directoryNameMismatch")
+  };
+  return knownIssues[issue] ?? issue;
 }
 
 function installSelected() {
@@ -183,6 +206,9 @@ function closePreview() {
         <button class="primary" :disabled="localLoading" @click="$emit('import')">
           {{ t("local.import") }}
         </button>
+        <button class="ghost" :disabled="discoveryLoading" @click="$emit('discover')">
+          {{ discoveryLoading ? t("local.discovering") : t("local.discover") }}
+        </button>
         <button class="ghost" :disabled="selectedSkills.length === 0 || localLoading" @click="installSelected">
           {{ t("local.installSelected", { count: selectedSkills.length }) }}
         </button>
@@ -204,6 +230,49 @@ function closePreview() {
         </button>
       </div>
     </div>
+
+    <section v-if="discoveryRoot" class="discovery-section">
+      <div class="discovery-heading">
+        <div>
+          <div class="discovery-title">
+            {{ t("local.discoveryTitle", { count: discoveredSkills.length }) }}
+          </div>
+          <div class="card-link">{{ discoveryRoot }}</div>
+        </div>
+        <button class="ghost" :disabled="discoveryLoading" @click="$emit('clearDiscovery')">
+          {{ t("local.clearDiscovery") }}
+        </button>
+      </div>
+      <div v-if="!discoveryLoading && discoveredSkills.length === 0" class="hint">
+        {{ t("local.discoveryEmpty") }}
+      </div>
+      <div v-if="discoveredSkills.length > 0" class="cards discovery-cards">
+        <article v-for="skill in discoveredSkills" :key="skill.id" class="card discovery-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">{{ skill.name }}</div>
+              <div class="discovery-badges">
+                <span class="ide-badge active">{{ skill.provider }}</span>
+                <span class="standard-badge" :class="{ valid: skill.isStandard }">
+                  {{ skill.isStandard ? t("local.standard") : t("local.nonStandard") }}
+                </span>
+              </div>
+            </div>
+            <button class="ghost" @click="$emit('openDir', skill.path)">
+              {{ t("local.openDir") }}
+            </button>
+          </div>
+          <p class="card-desc">
+            {{ skill.description || t("local.previewEmptyDescription") }}
+          </p>
+          <div class="card-link">{{ skill.skillMdPath }}</div>
+          <ul v-if="skill.issues.length > 0" class="issue-list">
+            <li v-for="issue in skill.issues" :key="issue">{{ discoveryIssueLabel(issue) }}</li>
+          </ul>
+        </article>
+      </div>
+      <div class="hint">{{ t("local.discoveryReadOnlyHint") }}</div>
+    </section>
 
     <DownloadQueue
       :tasks="downloadQueue"
@@ -334,6 +403,66 @@ function closePreview() {
 .local-card.linked {
   border-color: var(--color-success-border);
   box-shadow: inset 0 0 0 1px var(--color-success-border);
+}
+
+.discovery-section {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 12px;
+  background: var(--color-panel-bg);
+}
+
+.discovery-heading,
+.discovery-badges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.discovery-title {
+  font-weight: 700;
+}
+
+.discovery-cards {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.discovery-card {
+  background: var(--color-card-bg);
+}
+
+.discovery-badges {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.standard-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-error-border);
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.standard-badge.valid {
+  border-color: var(--color-success-border);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.issue-list {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .card-title-row,

@@ -58,6 +58,37 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 - Overview of all skills currently downloaded to your local repository.
 - Click "Install" to select target IDEs for deployment via symlinks.
 
+#### Windows: recursively discover skills in a folder
+
+On the **Local Skills** page, click **Discover Skills in Folder** and choose any Windows folder. The app recursively finds `SKILL.md` files below that folder. Discovery is read-only: it does not copy, move, modify, or automatically import discovered skills.
+
+Results identify common `.agents/skills` folders and Agent CLI locations for Codex, Claude Code, Cursor, Gemini/Antigravity, VS Code/GitHub Copilot, Windsurf, Qoder, Trae, Kiro, CodeBuddy, OpenClaw, and OpenCode. Unknown locations are shown as generic `SKILL.md` skills.
+
+Each result is marked as a standard or compatible non-standard Agent Skill. The current standard checks require:
+
+- YAML frontmatter delimited by `---`;
+- non-empty `name` and `description` fields;
+- a 1–64 character lowercase `name` using letters, digits, and single hyphens only;
+- a `name` matching the containing directory;
+- a `description` no longer than 1024 characters.
+
+Every folder containing `SKILL.md` remains visible, including Agent CLI-specific compatible skills. Non-standard results list the exact validation issues.
+
+#### Managed storage and copy behavior
+
+Skills Manager maintains its own repository at `%USERPROFILE%\.skills-manager\skills` on Windows (`~/.skills-manager/skills` on other systems).
+
+| Operation | Copies into managed storage | Behavior |
+| --- | --- | --- |
+| Discover Skills in Folder | No | Read-only recursive scan and validation |
+| Import Local Skill | Yes | Copies the selected skill folder into managed storage |
+| Manage Centrally | Yes | Copies an IDE skill into managed storage, then replaces it with a link |
+| Marketplace download | Yes | Downloads and extracts into managed storage |
+| Install to IDE | Usually no | Prefers a symlink; Windows falls back to a directory junction |
+| Install to Qoder on Windows | Yes | Uses a managed copy with a `.skills-manager-source` marker |
+
+Discovery and import are deliberately separate. This first version never copies a skill merely because it was discovered; use **Import Local Skill** or **Manage Centrally** when you want Skills Manager to own it.
+
 ### ⌨️ 3) IDE Browser
 
 - Switch workspace perspective (e.g., VSCode or Cursor) to view mounted skills for each IDE.

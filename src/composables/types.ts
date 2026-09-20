@@ -44,6 +44,21 @@ export type LocalSkillPreview = {
 };
 
 /**
+ * Skill found by recursively scanning a user-selected directory.
+ * Discovery is read-only; the skill is not copied into manager storage.
+ */
+export type DiscoveredSkill = {
+  id: string;
+  name: string;
+  description: string;
+  path: string;
+  skillMdPath: string;
+  provider: string;
+  isStandard: boolean;
+  issues: string[];
+};
+
+/**
  * Skill in IDE directory
  */
 export type IdeSkill = {

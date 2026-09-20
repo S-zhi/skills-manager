@@ -78,6 +78,9 @@ const {
   updatingId,
   localSkills,
   localLoading,
+  discoveredSkills,
+  discoveryRoot,
+  discoveryLoading,
   ideOptions,
   selectedIdeFilter,
   customIdeName,
@@ -110,6 +113,8 @@ const {
   confirmUninstall,
   cancelUninstall,
   importLocalSkill,
+  discoverSkillsInDirectory,
+  clearDiscoveredSkills,
   exportLocalSkills,
   openSkillDirectory,
   adoptIdeSkill,
@@ -278,6 +283,9 @@ async function handleLinkSkills(projectId: string) {
         <LocalPanel
           :local-skills="localSkills"
           :local-loading="localLoading"
+          :discovered-skills="discoveredSkills"
+          :discovery-root="discoveryRoot"
+          :discovery-loading="discoveryLoading"
           :installing-id="installingId"
           :download-queue="downloadQueue"
           :ide-options="ideOptions"
@@ -290,6 +298,8 @@ async function handleLinkSkills(projectId: string) {
           @open-dir="openSkillDirectory"
           @refresh="scanLocalSkills"
           @import="importLocalSkill"
+          @discover="discoverSkillsInDirectory"
+          @clear-discovery="clearDiscoveredSkills"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
         />

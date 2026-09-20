@@ -131,6 +131,25 @@ pub struct ImportRequest {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct SkillDiscoveryRequest {
+    pub root_path: String,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveredSkill {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub path: String,
+    pub skill_md_path: String,
+    pub provider: String,
+    pub is_standard: bool,
+    pub issues: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct DeleteLocalSkillRequest {
     pub target_paths: Vec<String>,
 }
