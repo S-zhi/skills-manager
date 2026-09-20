@@ -1,2 +1,9 @@
+pub mod create_skill;
+pub mod github_sync;
+pub mod history;
+pub mod library_metadata;
 pub mod market;
+pub mod packages;
 pub mod skills;
+pub mod skillsmp;
+pub mod trash;

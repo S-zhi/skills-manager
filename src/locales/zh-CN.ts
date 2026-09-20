@@ -1,7 +1,27 @@
 export default {
+  createSkill: {
+    title: '新建 Skill', hint: '把你的工作方法整理成一个 Skill，保存到统一仓库。',
+    name: 'Skill 名称', nameHelp: '1–64 位小写字母、数字或单连字符，例如 document-review。名称也作为目录名。',
+    description: '描述与适用场景', descriptionPlaceholder: '说明 Skill 能做什么，以及何时应该使用它。',
+    body: '指令正文（Markdown）', bodyPlaceholder: '# 使用说明\n\n## 工作步骤\n1. …\n\n## 输出要求\n…',
+    bodyHelp: '填写具体步骤、约束和输出要求。名称、描述和 UUID 元数据由应用自动添加。',
+    preview: '预览 SKILL.md', destination: '保存位置', submit: '创建 Skill', uuidPending: '创建时自动生成',
+    identityHint: '自动生成独立 UUID，同名目录不会被覆盖。', success: 'Skill 创建成功', view: '查看我的 Skills', another: '继续新建', close: '关闭新建 Skill 窗口'
+  },
+  packages: {
+    title: "Skill 包", hint: "按用途组合已有 Skill。同一个 Skill 可加入多个包，文件仍保留在统一仓库。",
+    create: "创建 Skill 包", edit: "编辑包", choose: "选择 Skill 包", empty: "还没有 Skill 包，创建一个来组合常用技能。",
+    name: "包名称", description: "描述", members: "成员 Skills", search: "搜索 Skill 名称、UUID 或路径",
+    save: "保存", cancel: "取消", delete: "删除包", confirmDelete: "确认删除包",
+    deleteConfirm: "删除此包？只删除分组配置，成员 Skill 文件仍然保留。",
+    saved: "Skill 包已保存", deleted: "Skill 包已删除", loading: "正在加载…",
+    missing: "成员缺失（可在编辑包时取消勾选移除）", noMembers: "此包暂无成员，可点击编辑包添加。",
+    install: "安装包内可用 Skills", export: "导出包内可用 Skills（ZIP）"
+  },
   app: {
     tabs: {
-      local: "已有 Skills",
+      local: "我的 Skills",
+      discover: "发现与导入",
       market: "Market",
       ide: "IDE 浏览",
       projects: "项目管理",
@@ -86,8 +106,12 @@ export default {
     loadMore: "加载更多"
   },
   local: {
-    title: "已有 Skills",
-    hint: "导入本地 Skill 需要选择包含 SKILL.md 的 Skill 文件夹。",
+    more: "更多操作",
+    title: "我的 Skills",
+    hint: "统一查看和管理已导入的 Skill；旧仓库内容会继续显示并可正常使用。",
+    storageTitle: "统一仓库",
+    uuidLabel: "UUID",
+    legacyRepository: "旧仓库",
     total: "总数 {count}",
     filteredTotal: "显示 {shown} / {total}",
     selectAll: "全选",
@@ -101,7 +125,7 @@ export default {
     updateSelected: "更新选中 ({count})",
     exportOne: "导出",
     exportSelected: "导出选中 ({count})",
-    import: "导入本地 Skill",
+    import: "导入 Skill",
     discover: "发现目录中的 Skills",
     discovering: "正在发现 Skills...",
     selectDiscoveryDir: "选择要递归扫描的目录",
@@ -135,6 +159,35 @@ export default {
     processing: "处理中...",
     linked: "已关联",
     unused: "未关联"
+  },
+  discovery: {
+    title: "导入 Skill",
+    hint: "选择 Skill 文件夹或包含多个 Skills 的上级目录，系统会自动识别单个或批量导入。扫描后默认全选，确认后才会复制到统一仓库。",
+    back: "返回我的 Skills",
+    chooseFolder: "选择文件夹",
+    close: "关闭导入 Skill 窗口",
+    singleMode: "已识别为单个导入",
+    batchMode: "已识别为批量导入 · {count} 个 Skill",
+    duplicate: "已存在，不可导入",
+    duplicateCount: "{count} 个重复项已禁用",
+    storageTitle: "Skill Manager 统一存储目录",
+    storageLoading: "正在加载存储目录...",
+    openStorage: "打开统一仓库",
+    importSelected: "导入选中（{count}）",
+    importing: "正在导入...",
+    selectVisible: "全选当前结果",
+    clearSelection: "清空选择",
+    selectedCount: "已选 {count} 个",
+    uuidPending: "导入时生成 UUID",
+    searchPlaceholder: "搜索名称、描述、路径或来源",
+    filterAll: "全部规范状态",
+    filteredEmpty: "当前筛选条件下没有 Skill。",
+    openImported: "打开导入目录",
+    importStatus: {
+      imported: "已导入",
+      skipped: "已跳过",
+      failed: "导入失败"
+    }
   },
   ide: {
     title: "IDE 浏览",
@@ -197,6 +250,7 @@ export default {
     adopting: "正在纳入统一管理...",
     handled: "已处理 {linked} 个目标，跳过 {skipped} 个目标。",
     imported: "成功导入 {success} 个 Skill，失败 {failed} 个。",
+    batchImported: "导入完成：新增 {imported} 个，跳过 {skipped} 个，失败 {failed} 个。",
     exported: "已导出到 {path}",
     selectSkillsForProject: "请为项目 {name} 选择要安装的 Skills"
   },
@@ -210,6 +264,7 @@ export default {
     deleteFailed: "删除失败。",
     importFailed: "导入失败。",
     discoveryFailed: "目录 Skill 发现失败。",
+    storageFailed: "无法初始化 Skill Manager 统一存储目录。",
     exportFailed: "导出失败。",
     previewFailed: "加载 Skill 预览失败。",
     openDirFailed: "打开目录失败。",

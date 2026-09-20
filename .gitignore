@@ -1,4 +1,7 @@
 node_modules
+.npm-cache
+.clawdbot
+.omc
 .DS_Store
 /dist
 /src-tauri/target

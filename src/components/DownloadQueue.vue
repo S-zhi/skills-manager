@@ -93,11 +93,11 @@ defineEmits<{
 }
 
 .task-status.done {
-  color: var(--success, #22c55e);
+  color: var(--color-success-text);
 }
 
 .task-status.error {
-  color: var(--error, #ef4444);
+  color: var(--color-error-text);
 }
 
 .task-actions {

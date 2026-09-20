@@ -29,6 +29,7 @@ export type InstallResult = {
  */
 export type LocalSkill = {
   id: string;
+  uuid: string;
   name: string;
   description: string;
   path: string;
@@ -43,19 +44,73 @@ export type LocalSkillPreview = {
   skillMdContent: string;
 };
 
+export type SkillLibraryEntry = {
+  uuid: string;
+  favorite: boolean;
+  tags: string[];
+};
+
+export type SkillLibraryStore = {
+  schemaVersion: number;
+  revision: number;
+  entries: SkillLibraryEntry[];
+};
+
+export type SkillPackage = {
+  id: string;
+  name: string;
+  description: string;
+  skillUuids: string[];
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type SkillPackageStore = {
+  schemaVersion: number;
+  revision: number;
+  packages: SkillPackage[];
+};
+
 /**
  * Skill found by recursively scanning a user-selected directory.
  * Discovery is read-only; the skill is not copied into manager storage.
  */
 export type DiscoveredSkill = {
   id: string;
+  uuid?: string;
   name: string;
   description: string;
   path: string;
   skillMdPath: string;
   provider: string;
   isStandard: boolean;
+  isDuplicate: boolean;
   issues: string[];
+};
+
+export type ManagerStorageInfo = {
+  rootPath: string;
+  skillsPath: string;
+  pluginsPath: string;
+  legacySkillsPath: string;
+  legacyExists: boolean;
+};
+
+export type SkillImportStatus = "imported" | "skipped" | "failed";
+
+export type SkillImportItemResult = {
+  sourcePath: string;
+  name: string;
+  targetPath?: string;
+  status: SkillImportStatus;
+  message: string;
+};
+
+export type BatchImportResult = {
+  items: SkillImportItemResult[];
+  imported: number;
+  skipped: number;
+  failed: number;
 };
 
 /**
@@ -102,6 +157,8 @@ export type DownloadTask = {
   id: string;
   name: string;
   sourceUrl: string;
+  skillUuid?: string;
+  targetPath?: string;
   action: "download" | "update";
   status: "pending" | "downloading" | "done" | "error";
   error?: string;

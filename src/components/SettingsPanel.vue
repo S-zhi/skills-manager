@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { i18n, supportedLocales, type SupportedLocale } from "../i18n";
 import { useUpdateStore } from "../composables/useUpdateStore";
 import { useToast } from "../composables/useToast";
+import GithubSyncPanel from "./GithubSyncPanel.vue";
 
 const { t } = useI18n();
 const toast = useToast();
@@ -131,6 +132,7 @@ onMounted(async () => {
 
 <template>
   <div class="settings-panel">
+    <GithubSyncPanel />
     <!-- About Section -->
     <section class="settings-section">
       <h2 class="section-title">{{ t("settings.about.title") }}</h2>

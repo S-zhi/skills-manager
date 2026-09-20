@@ -6,7 +6,8 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useToast } from "./useToast";
 import type {
   RemoteSkill, InstallResult, LocalSkill,
-  IdeSkill, Overview, LinkTarget, DownloadTask, ProjectConfig, DiscoveredSkill
+  IdeSkill, Overview, LinkTarget, DownloadTask, ProjectConfig, DiscoveredSkill,
+  ManagerStorageInfo, BatchImportResult, SkillImportItemResult
 } from "./types";
 import { buildProjectLinkTargets } from "./projectTargets";
 import { useIdeConfig } from "./useIdeConfig";
@@ -14,21 +15,26 @@ import {
   isSafeRelativePath,
   getErrorMessage,
   isSafeAbsolutePath,
-  parseManualSkillSource,
-  normalizeSkillName
+  parseManualSkillSource
 } from "./utils";
 
 export function useSkillsManager() {
+  type SearchResponse = { skills: RemoteSkill[]; total: number; limit: number; offset: number; hasNext?: boolean; dailyRemaining?: number | null };
   const { t } = useI18n();
   const toast = useToast();
   const cacheTtlMs = 10 * 60 * 1000;
   const searchCache = new Map<
     string,
-    { timestamp: number; data: { skills: RemoteSkill[]; total: number; limit: number; offset: number } }
+    { timestamp: number; data: SearchResponse }
   >();
-  const activeTab = ref<"local" | "market" | "ide" | "projects" | "settings">("local");
+  const activeTab = ref<"local" | "packages" | "market" | "ide" | "projects" | "settings" | "trash">("local");
 
   const query = ref("");
+  const marketSource = ref<"cached" | "skillsmp">("cached");
+  const marketError = ref("");
+  const dailyRemaining = ref<number | null>(null);
+  const onlineHasMore = ref(false);
+  let lastSearchKey = "";
   const results = ref<RemoteSkill[]>([]);
   const total = ref(0);
   const limit = ref(20);
@@ -44,6 +50,9 @@ export function useSkillsManager() {
   const discoveredSkills = ref<DiscoveredSkill[]>([]);
   const discoveryRoot = ref("");
   const discoveryLoading = ref(false);
+  const discoveryImporting = ref(false);
+  const discoveryImportResults = ref<Record<string, SkillImportItemResult>>({});
+  const managerStorage = ref<ManagerStorageInfo | null>(null);
 
   // Download Queue
   const downloadQueue = ref<DownloadTask[]>([]);
@@ -71,16 +80,13 @@ export function useSkillsManager() {
   const busyText = ref("");
   const recentTaskStatus = ref<Record<string, "download" | "update">>({});
 
-  const hasMore = computed(() => results.value.length < total.value);
+  const hasMore = computed(() => marketSource.value === "skillsmp" ? onlineHasMore.value : offset.value + limit.value < total.value);
   const sortedResults = computed(() => results.value);
-  const localSkillNameSet = computed(() => {
+  const localSkillSourceSet = computed(() => {
     const set = new Set<string>();
     for (const skill of localSkills.value) {
-      const nameKey = normalizeSkillName(skill.name);
-      if (nameKey) set.add(nameKey);
-
-      const pathKey = normalizeSkillName(skill.path.split(/[\\/]/).filter(Boolean).pop() ?? "");
-      if (pathKey) set.add(pathKey);
+      const sourceKey = skill.sourceUrl?.trim().toLowerCase();
+      if (sourceKey) set.add(sourceKey);
     }
     return set;
   });
@@ -111,8 +117,17 @@ export function useSkillsManager() {
     ideSkills.value.filter((skill) => skill.ide === selectedIdeFilter.value)
   );
   async function buildInstallBaseDir(): Promise<string> {
+    if (managerStorage.value?.skillsPath) return managerStorage.value.skillsPath;
     const home = await homeDir();
-    return join(home, ".skills-manager/skills");
+    return join(home, "Skill Manager/Skills");
+  }
+
+  async function loadManagerStorage() {
+    try {
+      managerStorage.value = await invoke<ManagerStorageInfo>("get_manager_storage_info");
+    } catch (err) {
+      toast.error(getErrorMessage(err, t("errors.storageFailed")));
+    }
   }
 
   function sanitizeExportFileName(name: string): string {
@@ -153,10 +168,24 @@ export function useSkillsManager() {
 
   async function searchMarketplace(reset = true, force = false) {
     if (loading.value) return;
+    const source = marketSource.value;
+    const keyword = query.value.trim();
+    const cacheKey = `${source}|${keyword}|${limit.value}`;
+    if (cacheKey !== lastSearchKey) reset = true;
+    marketError.value = "";
+    if (reset) {
+      results.value = [];
+      total.value = 0;
+      offset.value = 0;
+      onlineHasMore.value = false;
+    }
+    if (source === "skillsmp" && (!keyword || keyword.includes('*') || [...keyword].length > 200)) {
+      marketError.value = "SkillsMP：请输入 1–200 个字符的关键词，不支持 * / Enter a keyword (1–200 characters), not a wildcard.";
+      return;
+    }
     loading.value = true;
 
     const nextOffset = reset ? 0 : offset.value + limit.value;
-    const cacheKey = `${query.value.trim().toLowerCase()}|${limit.value}`;
 
     if (reset && !force) {
       const cached = searchCache.get(cacheKey);
@@ -164,38 +193,40 @@ export function useSkillsManager() {
         results.value = cached.data.skills;
         total.value = cached.data.total;
         offset.value = cached.data.offset;
+        onlineHasMore.value = cached.data.hasNext ?? false;
+        dailyRemaining.value = cached.data.dailyRemaining ?? null;
+        lastSearchKey = cacheKey;
         loading.value = false;
         return;
       }
     }
 
     try {
-      const response = await invoke("search_marketplaces", {
-        query: query.value,
+      const data = await invoke<SearchResponse>(source === "skillsmp" ? "search_skillsmp" : "search_marketplaces", {
+        query: keyword,
         limit: limit.value,
         offset: nextOffset
       });
-      const data = response as {
-        skills: RemoteSkill[];
-        total: number;
-        limit: number;
-        offset: number;
-      };
 
       const deduped = dedupeSkills(reset ? data.skills : [...results.value, ...data.skills]);
       results.value = deduped;
 
       total.value = data.total;
       offset.value = data.offset;
+      onlineHasMore.value = data.hasNext ?? false;
+      dailyRemaining.value = data.dailyRemaining ?? null;
+      lastSearchKey = cacheKey;
 
       if (reset) {
+        if (searchCache.size >= 30) searchCache.delete(searchCache.keys().next().value!);
         searchCache.set(cacheKey, {
           timestamp: Date.now(),
           data
         });
       }
     } catch (err) {
-      toast.error(getErrorMessage(err, t("errors.searchFailed")));
+      marketError.value = getErrorMessage(err, t("errors.searchFailed"));
+      toast.error(marketError.value);
     } finally {
       loading.value = false;
     }
@@ -214,7 +245,11 @@ export function useSkillsManager() {
     return Array.from(map.values());
   }
 
-  function addToDownloadQueue(skill: RemoteSkill, action: "download" | "update" = "download") {
+  function addToDownloadQueue(
+    skill: RemoteSkill,
+    action: "download" | "update" = "download",
+    identity?: { skillUuid: string; targetPath: string }
+  ) {
     // Check if already in queue
     if (downloadQueue.value.some(t => t.id === skill.id)) {
       return;
@@ -223,6 +258,8 @@ export function useSkillsManager() {
       id: skill.id,
       name: skill.name,
       sourceUrl: skill.sourceUrl,
+      skillUuid: identity?.skillUuid,
+      targetPath: identity?.targetPath,
       action,
       status: 'pending'
     });
@@ -248,7 +285,9 @@ export function useSkillsManager() {
           request: {
             sourceUrl: task.sourceUrl,
             skillName: task.name,
-            installBaseDir
+            installBaseDir,
+            skillUuid: task.skillUuid,
+            targetPath: task.targetPath
           }
         });
         task.status = 'done';
@@ -301,7 +340,28 @@ export function useSkillsManager() {
   }
 
   async function updateSkill(skill: RemoteSkill) {
-    addToDownloadQueue(skill, "update");
+    const sourceKey = skill.sourceUrl.trim().toLowerCase();
+    const local = localSkills.value.find(
+      (candidate) => candidate.sourceUrl?.trim().toLowerCase() === sourceKey
+    );
+    addToDownloadQueue(
+      local ? { ...skill, name: local.name } : skill,
+      "update",
+      local ? { skillUuid: local.uuid, targetPath: local.path } : undefined
+    );
+  }
+
+  function setMarketSource(source: "cached" | "skillsmp") {
+    if (loading.value || source === marketSource.value) return;
+    marketSource.value = source;
+    results.value = [];
+    total.value = 0;
+    offset.value = 0;
+    onlineHasMore.value = false;
+    dailyRemaining.value = null;
+    marketError.value = "";
+    lastSearchKey = "";
+    if (source === "cached" || query.value.trim()) void searchMarketplace(true);
   }
 
   async function updateLocalSkill(skill: LocalSkill) {
@@ -325,7 +385,8 @@ export function useSkillsManager() {
         marketId: "local",
         marketLabel: "Local"
       },
-      "update"
+      "update",
+      { skillUuid: skill.uuid, targetPath: skill.path }
     );
   }
 
@@ -364,7 +425,7 @@ export function useSkillsManager() {
       marketLabel: t("market.manualSourceLabel")
     };
 
-    if (localSkillNameSet.value.has(normalizeSkillName(resolvedName))) {
+    if (localSkillSourceSet.value.has(parsed.normalizedUrl.toLowerCase())) {
       await updateSkill(remoteSkill);
       return "update" as const;
     }
@@ -648,59 +709,6 @@ export function useSkillsManager() {
     uninstallTargetPaths.value = [];
   }
 
-  async function importLocalSkill() {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        directory: true,
-        multiple: true,
-        title: t("local.selectSkillDir")
-      });
-
-      if (!selected) return;
-
-      const paths = Array.isArray(selected) ? selected : [selected];
-      if (paths.length === 0) return;
-
-      busy.value = true;
-      busyText.value = t("messages.importing");
-
-      let successCount = 0;
-      let failCount = 0;
-      let lastError = "";
-
-      for (const path of paths) {
-        try {
-          await invoke("import_local_skill", {
-            request: {
-              sourcePath: path
-            }
-          });
-          successCount++;
-        } catch (err) {
-          failCount++;
-          lastError = err instanceof Error ? err.message : String(err);
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(t("messages.imported", { success: successCount, failed: failCount }));
-      } else {
-        toast.error(
-          t("messages.imported", { success: 0, failed: failCount }) +
-          (paths.length === 1 ? `: ${lastError}` : "")
-        );
-      }
-
-      await scanLocalSkills();
-    } catch (err) {
-      toast.error(getErrorMessage(err, t("errors.importFailed")));
-    } finally {
-      busy.value = false;
-      busyText.value = "";
-    }
-  }
-
   async function discoverSkillsInDirectory() {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
@@ -714,6 +722,7 @@ export function useSkillsManager() {
       discoveryLoading.value = true;
       discoveryRoot.value = selected;
       discoveredSkills.value = [];
+      discoveryImportResults.value = {};
       discoveredSkills.value = await invoke<DiscoveredSkill[]>("discover_skills_in_directory", {
         request: { rootPath: selected }
       });
@@ -727,6 +736,34 @@ export function useSkillsManager() {
   function clearDiscoveredSkills() {
     discoveredSkills.value = [];
     discoveryRoot.value = "";
+    discoveryImportResults.value = {};
+  }
+
+  async function importDiscoveredSkills(skills: DiscoveredSkill[]) {
+    if (skills.length === 0 || discoveryImporting.value) return;
+    discoveryImporting.value = true;
+    try {
+      const result = await invoke<BatchImportResult>("import_discovered_skills", {
+        request: { sourcePaths: skills.map((skill) => skill.path) }
+      });
+      const nextResults = { ...discoveryImportResults.value };
+      for (const item of result.items) {
+        nextResults[item.sourcePath] = item;
+      }
+      discoveryImportResults.value = nextResults;
+      toast.success(
+        t("messages.batchImported", {
+          imported: result.imported,
+          skipped: result.skipped,
+          failed: result.failed
+        })
+      );
+      await scanLocalSkills();
+    } catch (err) {
+      toast.error(getErrorMessage(err, t("errors.importFailed")));
+    } finally {
+      discoveryImporting.value = false;
+    }
   }
 
   async function exportLocalSkills(skills: LocalSkill[]) {
@@ -840,6 +877,7 @@ export function useSkillsManager() {
 
   onMounted(() => {
     refreshIdeOptions();
+    void loadManagerStorage();
     void searchMarketplace(true);
     void scanLocalSkills();
   });
@@ -861,6 +899,9 @@ export function useSkillsManager() {
     discoveredSkills,
     discoveryRoot,
     discoveryLoading,
+    discoveryImporting,
+    discoveryImportResults,
+    managerStorage,
     ideOptions,
     selectedIdeFilter,
     customIdeName,
@@ -873,7 +914,7 @@ export function useSkillsManager() {
     busyText,
     hasMore,
     sortedResults,
-    localSkillNameSet,
+    localSkillSourceSet,
     filteredIdeSkills,
     customIdeOptions,
     downloadQueue,
@@ -885,6 +926,10 @@ export function useSkillsManager() {
     addCustomIde,
     removeCustomIde,
     searchMarketplace,
+    marketSource,
+    marketError,
+    dailyRemaining,
+    setMarketSource,
     downloadSkill,
     updateSkill,
     updateLocalSkill,
@@ -900,9 +945,10 @@ export function useSkillsManager() {
     openDeleteLocalModal,
     confirmUninstall,
     cancelUninstall,
-    importLocalSkill,
     discoverSkillsInDirectory,
     clearDiscoveredSkills,
+    importDiscoveredSkills,
+    loadManagerStorage,
     exportLocalSkills,
     openSkillDirectory,
     adoptIdeSkill,

@@ -3727,9 +3727,11 @@ checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
 name = "skills-manager-gui"
 version = "0.4.1"
 dependencies = [
+ "base64 0.22.1",
  "dirs 5.0.1",
  "serde",
  "serde_json",
+ "sha1",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -3739,6 +3741,7 @@ dependencies = [
  "tauri-plugin-updater",
  "ureq",
  "urlencoding",
+ "uuid",
  "walkdir",
  "zip 2.4.2",
 ]

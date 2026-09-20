@@ -252,7 +252,7 @@ function adoptSelected() {
 }
 
 .status-badge.unmanaged {
-  color: #8a4b00;
+  color: var(--color-warning-text);
   background: rgba(245, 158, 11, 0.16);
   border: 1px solid rgba(245, 158, 11, 0.28);
 }

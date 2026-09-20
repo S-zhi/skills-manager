@@ -46,6 +46,7 @@ function close() {
 
         <div class="preview-body">
           <div class="preview-meta-grid">
+            <div class="preview-meta-item preview-meta-item-wide"><div class="preview-meta-label">UUID</div><div class="preview-meta-value preview-path">{{ skill?.uuid }}</div></div>
             <div class="preview-meta-item">
               <div class="preview-meta-label">{{ t("local.previewUsedBy") }}</div>
               <div class="preview-meta-value">{{ usedByText }}</div>

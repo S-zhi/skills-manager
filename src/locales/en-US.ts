@@ -1,7 +1,27 @@
 export default {
+  createSkill: {
+    title: 'New Skill', hint: 'Turn your workflow into a skill and save it in your managed library.',
+    name: 'Skill name', nameHelp: '1–64 lowercase letters, digits or single hyphens, e.g. document-review. Also used as the folder name.',
+    description: 'Description and use cases', descriptionPlaceholder: 'Explain what this skill does and when to use it.',
+    body: 'Instructions (Markdown)', bodyPlaceholder: '# Instructions\n\n## Steps\n1. …\n\n## Expected output\n…',
+    bodyHelp: 'Write steps, constraints and output requirements. Name, description and UUID metadata are added automatically.',
+    preview: 'Preview SKILL.md', destination: 'Save location', submit: 'Create Skill', uuidPending: 'Generated on creation',
+    identityHint: 'A unique UUID is generated. Existing folders are never overwritten.', success: 'Skill created', view: 'View My Skills', another: 'Create another', close: 'Close new skill dialog'
+  },
+  packages: {
+    title: "Skill packages", hint: "Group managed skills by purpose. A skill can belong to multiple packages without moving its files.",
+    create: "Create package", edit: "Edit package", choose: "Choose package", empty: "No packages yet. Create one to group your skills.",
+    name: "Package name", description: "Description", members: "Member skills", search: "Search skill name, UUID or path",
+    save: "Save", cancel: "Cancel", delete: "Delete package", confirmDelete: "Confirm deletion",
+    deleteConfirm: "Delete this package? Only the grouping is removed; skill files are preserved.",
+    saved: "Package saved", deleted: "Package deleted", loading: "Loading…",
+    missing: "Missing member (uncheck in the editor to remove)", noMembers: "This package has no members. Edit it to add skills.",
+    install: "Install available members", export: "Export available members (ZIP)"
+  },
   app: {
     tabs: {
-      local: "Local Skills",
+      local: "My Skills",
+      discover: "Discover & Import",
       market: "Market",
       ide: "IDE Browser",
       projects: "Projects",
@@ -87,8 +107,12 @@ export default {
     unavailable: "Unavailable"
   },
   local: {
-    title: "Local Skills",
-    hint: "To import local skills, select the folder containing SKILL.md.",
+    more: "More actions",
+    title: "My Skills",
+    hint: "View and manage imported skills in one place. Skills in the legacy repository remain visible and usable.",
+    storageTitle: "Unified repository",
+    uuidLabel: "UUID",
+    legacyRepository: "Legacy repository",
     total: "Total {count}",
     filteredTotal: "Showing {shown} / {total}",
     selectAll: "Select all",
@@ -102,7 +126,7 @@ export default {
     updateSelected: "Update Selected ({count})",
     exportOne: "Export",
     exportSelected: "Export selected ({count})",
-    import: "Import Local Skill",
+    import: "Import Skill",
     discover: "Discover Skills in Folder",
     discovering: "Discovering skills...",
     selectDiscoveryDir: "Choose a folder to scan recursively",
@@ -136,6 +160,35 @@ export default {
     processing: "Processing...",
     linked: "Linked",
     unused: "Not linked"
+  },
+  discovery: {
+    title: "Import Skill",
+    hint: "Choose a Skill folder or a parent folder containing multiple Skills. The app detects single or batch import automatically, selects all results by default, and copies files only after confirmation.",
+    back: "Back to My Skills",
+    chooseFolder: "Choose folder",
+    close: "Close import Skill dialog",
+    singleMode: "Single import detected",
+    batchMode: "Batch import detected · {count} Skills",
+    duplicate: "Already exists — cannot import",
+    duplicateCount: "{count} duplicates disabled",
+    storageTitle: "Skill Manager storage",
+    storageLoading: "Loading storage location...",
+    openStorage: "Open repository",
+    importSelected: "Import selected ({count})",
+    importing: "Importing...",
+    selectVisible: "Select visible",
+    clearSelection: "Clear selection",
+    selectedCount: "{count} selected",
+    uuidPending: "UUID generated on import",
+    searchPlaceholder: "Search name, description, path, or provider",
+    filterAll: "All compliance states",
+    filteredEmpty: "No skills match the current filters.",
+    openImported: "Open imported folder",
+    importStatus: {
+      imported: "Imported",
+      skipped: "Skipped",
+      failed: "Failed"
+    }
   },
   ide: {
     title: "IDE Browser",
@@ -198,6 +251,7 @@ export default {
     adopting: "Adding to central management...",
     handled: "Handled {linked} targets, skipped {skipped} targets.",
     imported: "Successfully imported {success} skills, failed {failed}.",
+    batchImported: "Import complete: {imported} added, {skipped} skipped, {failed} failed.",
     exported: "Exported to {path}",
     selectSkillsForProject: "Select skills to install for project {name}"
   },
@@ -215,6 +269,7 @@ export default {
     deleteFailed: "Deletion failed.",
     importFailed: "Import failed.",
     discoveryFailed: "Failed to discover skills in the selected folder.",
+    storageFailed: "Failed to initialize the Skill Manager storage directory.",
     exportFailed: "Export failed.",
     previewFailed: "Failed to load skill preview.",
     openDirFailed: "Failed to open folder.",

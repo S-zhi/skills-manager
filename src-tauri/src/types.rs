@@ -46,6 +46,10 @@ pub struct DownloadRequest {
     pub source_url: String,
     pub skill_name: String,
     pub install_base_dir: String,
+    #[serde(default)]
+    pub skill_uuid: Option<String>,
+    #[serde(default)]
+    pub target_path: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -67,6 +71,7 @@ pub struct LinkRequest {
 #[serde(rename_all = "camelCase")]
 pub struct LocalSkill {
     pub id: String,
+    pub uuid: String,
     pub name: String,
     pub description: String,
     pub path: String,
@@ -131,6 +136,14 @@ pub struct ImportRequest {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct SaveLocalSkillRequest {
+    pub skill_path: String,
+    pub expected_content: String,
+    pub content: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SkillDiscoveryRequest {
     pub root_path: String,
 }
@@ -139,13 +152,50 @@ pub struct SkillDiscoveryRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveredSkill {
     pub id: String,
+    pub uuid: Option<String>,
     pub name: String,
     pub description: String,
     pub path: String,
     pub skill_md_path: String,
     pub provider: String,
     pub is_standard: bool,
+    pub is_duplicate: bool,
     pub issues: Vec<String>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagerStorageInfo {
+    pub root_path: String,
+    pub skills_path: String,
+    pub plugins_path: String,
+    pub legacy_skills_path: String,
+    pub legacy_exists: bool,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchImportRequest {
+    pub source_paths: Vec<String>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillImportItemResult {
+    pub source_path: String,
+    pub name: String,
+    pub target_path: Option<String>,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchImportResult {
+    pub items: Vec<SkillImportItemResult>,
+    pub imported: usize,
+    pub skipped: usize,
+    pub failed: usize,
 }
 
 #[derive(Deserialize, Debug)]

@@ -8,6 +8,11 @@ import { useProjectConfig } from "./composables/useProjectConfig";
 import { useToast } from "./composables/useToast";
 import MarketPanel from "./components/MarketPanel.vue";
 import LocalPanel from "./components/LocalPanel.vue";
+import AppIcon from "./components/AppIcon.vue";
+import WindowTitlebar from "./components/WindowTitlebar.vue";
+import TrashPanel from "./components/TrashPanel.vue";
+import CreateSkillPanel from "./components/CreateSkillPanel.vue";
+import DiscoveryPanel from "./components/DiscoveryPanel.vue";
 import IdePanel from "./components/IdePanel.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import ProjectsPanel from "./components/ProjectsPanel.vue";
@@ -72,6 +77,10 @@ watch(theme, (next) => {
 const {
   activeTab,
   query,
+  marketSource,
+  marketError,
+  dailyRemaining,
+  setMarketSource,
   sortedResults,
   loading,
   installingId,
@@ -81,6 +90,9 @@ const {
   discoveredSkills,
   discoveryRoot,
   discoveryLoading,
+  discoveryImporting,
+  discoveryImportResults,
+  managerStorage,
   ideOptions,
   selectedIdeFilter,
   customIdeName,
@@ -94,7 +106,7 @@ const {
   busy,
   busyText,
   hasMore,
-  localSkillNameSet,
+  localSkillSourceSet,
   searchMarketplace,
   downloadSkill,
   updateSkill,
@@ -112,9 +124,9 @@ const {
   closeInstallModal,
   confirmUninstall,
   cancelUninstall,
-  importLocalSkill,
   discoverSkillsInDirectory,
   clearDiscoveredSkills,
+  importDiscoveredSkills,
   exportLocalSkills,
   openSkillDirectory,
   adoptIdeSkill,
@@ -145,7 +157,14 @@ const {
 
 const showProjectAddModal = ref(false);
 const showProjectConfigModal = ref(false);
+const showCreateSkillModal = ref(false);
+const showImportSkillModal = ref(false);
 const configuringProject = ref<typeof selectedProject.value>(null);
+
+function closeImportSkillModal() {
+  showImportSkillModal.value = false;
+  clearDiscoveredSkills();
+}
 
 async function handleAddProject() {
   showProjectAddModal.value = true;
@@ -204,40 +223,48 @@ async function handleLinkSkills(projectId: string) {
 </script>
 
 <template>
+  <div class="window-shell">
+  <WindowTitlebar />
   <div class="app">
     <header class="header">
-      <div class="header-spacer" />
+      <div class="brand"><span class="brand-mark">S</span><div>Skill Manager<small>YOUR PERSONAL TOOLKIT</small></div></div>
       <div class="tabs">
         <button class="tab" :class="{ active: activeTab === 'local' }" @click="activeTab = 'local'">
+          <AppIcon name="library" />
           {{ t("app.tabs.local") }}
         </button>
+        <button class="tab" :class="{ active: activeTab === 'packages' }" @click="activeTab = 'packages'"><AppIcon name="package" />{{ t('packages.title') }}</button>
         <button
           class="tab"
           :class="{ active: activeTab === 'market' }"
           @click="activeTab = 'market'"
         >
-          {{ t("app.tabs.market") }}
+          <AppIcon name="market" />{{ t("app.tabs.market") }}
         </button>
         <button
           class="tab"
           :class="{ active: activeTab === 'ide' }"
           @click="activeTab = 'ide'"
         >
-          {{ t("app.tabs.ide") }}
+          <AppIcon name="editor" />{{ t("app.tabs.ide") }}
         </button>
         <button
           class="tab"
           :class="{ active: activeTab === 'projects' }"
           @click="activeTab = 'projects'"
         >
-          {{ t("app.tabs.projects") }}
+          <AppIcon name="folder" />{{ t("app.tabs.projects") }}
         </button>
         <button
           class="tab"
+          :class="{ active: activeTab === 'trash' }"
+          @click="activeTab = 'trash'"
+        ><AppIcon name="trash" />{{ locale === 'zh-CN' ? '回收站' : 'Recycle bin' }}</button>
+        <button class="tab"
           :class="{ active: activeTab === 'settings' }"
           @click="activeTab = 'settings'"
         >
-          {{ t("app.tabs.settings") }}
+          <AppIcon name="settings" />{{ t("app.tabs.settings") }}
           <span v-if="updateAvailable" class="tab-badge"></span>
         </button>
       </div>
@@ -279,13 +306,12 @@ async function handleLinkSkills(projectId: string) {
     </header>
 
     <main class="content">
-      <template v-if="activeTab === 'local'">
+      <template v-if="activeTab === 'local' || activeTab === 'packages'">
         <LocalPanel
+          :packages-only="activeTab === 'packages'"
           :local-skills="localSkills"
           :local-loading="localLoading"
-          :discovered-skills="discoveredSkills"
-          :discovery-root="discoveryRoot"
-          :discovery-loading="discoveryLoading"
+          :manager-storage="managerStorage"
           :installing-id="installingId"
           :download-queue="downloadQueue"
           :ide-options="ideOptions"
@@ -296,10 +322,9 @@ async function handleLinkSkills(projectId: string) {
           @export-local="exportLocalSkills"
           @delete-local="openDeleteLocalModal"
           @open-dir="openSkillDirectory"
+          @create="showCreateSkillModal = true"
           @refresh="scanLocalSkills"
-          @import="importLocalSkill"
-          @discover="discoverSkillsInDirectory"
-          @clear-discovery="clearDiscoveredSkills"
+          @import="showImportSkillModal = true"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
         />
@@ -308,12 +333,17 @@ async function handleLinkSkills(projectId: string) {
       <template v-else-if="activeTab === 'market'">
         <MarketPanel
           v-model:query="query"
+          :market-source="marketSource"
+          :market-error="marketError"
+          :daily-remaining="dailyRemaining"
+          @source="setMarketSource"
+          @retry="retryDownload"
           :loading="loading"
           :results="sortedResults"
           :has-more="hasMore"
           :installing-id="installingId"
           :updating-id="updatingId"
-          :local-skill-name-set="localSkillNameSet"
+          :local-skill-source-set="localSkillSourceSet"
           :download-queue="downloadQueue"
           :recent-task-status="recentTaskStatus"
           @search="searchMarketplace(true)"
@@ -365,7 +395,31 @@ async function handleLinkSkills(projectId: string) {
       <template v-else-if="activeTab === 'settings'">
         <SettingsPanel />
       </template>
+      <TrashPanel v-else-if="activeTab === 'trash'" @changed="scanLocalSkills" />
     </main>
+
+    <CreateSkillPanel
+      v-if="showCreateSkillModal"
+      :storage="managerStorage"
+      @close="showCreateSkillModal = false"
+      @created="scanLocalSkills"
+      @view="showCreateSkillModal = false"
+      @open-dir="openSkillDirectory"
+    />
+
+    <DiscoveryPanel
+      v-if="showImportSkillModal"
+      :skills="discoveredSkills"
+      :root-path="discoveryRoot"
+      :loading="discoveryLoading"
+      :importing="discoveryImporting"
+      :import-results="discoveryImportResults"
+      @close="closeImportSkillModal"
+      @discover="discoverSkillsInDirectory"
+      @clear="clearDiscoveredSkills"
+      @import="importDiscoveredSkills"
+      @open-dir="openSkillDirectory"
+    />
 
     <InstallModal
       :visible="showInstallModal"
@@ -400,6 +454,7 @@ async function handleLinkSkills(projectId: string) {
     <Toast />
 
     <LoadingOverlay :visible="busy" :text="busyText" />
+  </div>
   </div>
 </template>
 
@@ -517,6 +572,8 @@ button {
 </style>
 
 <style scoped>
+.window-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.window-shell > .app { flex: 1; height: 0; min-height: 0; }
 .app {
   display: flex;
   flex-direction: column;
@@ -633,4 +690,21 @@ button {
   min-height: 0;
   overflow: auto;
 }
+.app { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 0; padding: 0; }
+.header { flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 32px 16px 20px; gap: 32px; background: var(--color-bg); border: 0; border-right: 1px solid var(--color-panel-border); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 7px; font-size: 16px; font-weight: 650; letter-spacing: -.4px; }
+.brand small { display: block; font-size: 8px; letter-spacing: 1.2px; color: var(--color-muted); margin-top: 4px; font-weight: 500; }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 36px; background: var(--color-primary-bg); border-radius: 11px; color: var(--color-primary-text); font-size: 23px; box-shadow: var(--shadow-accent); }
+.tabs { flex-direction: column; border: 0; background: transparent; padding: 0; gap: 5px; border-radius: 0; }
+.tab { text-align: left; padding: 11px 14px; font-size: 13px; display: flex; align-items: center; gap: 11px; }
+.tab :deep(.app-icon) { opacity: .8; }
+.tab.active :deep(.app-icon), .tab:hover :deep(.app-icon) { opacity: 1; }
+.tab:last-child { margin-top: 24px; }
+.tab.active { background: var(--color-accent-soft); color: var(--color-accent); box-shadow: inset 3px 0 0 var(--color-accent); }
+.tab:hover { transform: none; background: var(--color-tabs-bg); }
+.tab.active:hover { background: var(--color-accent-soft); }
+.header-controls { flex: 0; margin-top: auto; justify-content: flex-start; padding: 12px 6px 0; border-top: 1px solid var(--color-panel-border); }
+.content { background: var(--color-panel-bg); padding: 36px 40px; }
+@media(max-width: 850px) { .app { grid-template-columns: 176px minmax(0, 1fr); } .header { padding: 24px 10px; } .brand { font-size: 13px; } .brand small { font-size: 7px; } .content { padding: 28px 22px; } }
+@media(max-width: 600px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } .header { padding: 10px; gap: 10px; } .brand, .header-controls { display: none; } .tabs { flex-direction: row; overflow-x: auto; } .tab { white-space: nowrap; padding: 8px 10px; } .tab:last-child { margin: 0; } .tab::before { display: none; } .content { padding: 20px 14px; } }
 </style>
