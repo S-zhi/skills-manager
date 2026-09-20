@@ -86,6 +86,8 @@ pub struct LocalSkill {
 pub struct LocalSkillPreview {
     pub skill_md_path: String,
     pub skill_md_content: String,
+    pub display_description: Option<String>,
+    pub translation_status: String,
 }
 
 #[derive(Deserialize, Debug)]

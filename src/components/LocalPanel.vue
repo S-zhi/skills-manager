@@ -197,7 +197,8 @@ async function openPreview(skill: LocalSkill) {
 
   try {
     const result = await invoke<LocalSkillPreview>("read_local_skill_preview", {
-      skillPath: currentSkillPath
+      skillPath: currentSkillPath,
+      targetLanguage: locale.value
     });
     if (previewSkill.value?.path !== currentSkillPath) return;
     previewData.value = result;

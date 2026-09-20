@@ -1449,8 +1449,8 @@ pub fn discover_skills_in_directory(
         })
         .map(|entry| {
             let mut skill = inspect_discovered_skill(entry.path());
-            skill.is_duplicate = is_managed_duplicate(Path::new(&skill.path), &layout)
-                .unwrap_or(false);
+            skill.is_duplicate =
+                is_managed_duplicate(Path::new(&skill.path), &layout).unwrap_or(false);
             skill
         })
         .collect();
@@ -1553,17 +1553,37 @@ pub fn adopt_ide_skill(request: AdoptIdeSkillRequest) -> Result<String, String> 
 }
 
 #[tauri::command]
-pub fn read_local_skill_preview(skill_path: String) -> Result<LocalSkillPreview, String> {
+pub fn read_local_skill_preview(
+    skill_path: String,
+    target_language: Option<String>,
+) -> Result<LocalSkillPreview, String> {
     let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
     let layout = ensure_manager_layout(&home)?;
     let manager_roots = manager_skill_roots(&layout);
     let canonical = validate_manager_skill_path(&PathBuf::from(skill_path), &manager_roots)?;
     let skill_md_path = canonical.join("SKILL.md");
-    let skill_md_content = fs::read_to_string(&skill_md_path).map_err(|err| err.to_string())?;
+    let original_content = fs::read_to_string(&skill_md_path).map_err(|err| err.to_string())?;
+    let translated = match target_language
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        Some(language) => crate::commands::translation_settings::translate_skill_preview(
+            &home,
+            &original_content,
+            language,
+        )?,
+        None => crate::commands::translation_settings::TranslationResult {
+            content: original_content,
+            status: "original",
+        },
+    };
+    let display_description = parse_skill_document(&translated.content).description;
 
     Ok(LocalSkillPreview {
         skill_md_path: skill_md_path.display().to_string(),
-        skill_md_content,
+        skill_md_content: translated.content,
+        display_description,
+        translation_status: translated.status.to_string(),
     })
 }
 
@@ -1586,9 +1606,12 @@ fn save_local_skill_document(
         );
     }
     if request.content == current {
+        let display_description = parse_skill_document(&current).description;
         return Ok(LocalSkillPreview {
             skill_md_path: file.display().to_string(),
             skill_md_content: current,
+            display_description,
+            translation_status: "original".into(),
         });
     }
     let old = parse_skill_document(&current);
@@ -1662,6 +1685,8 @@ fn save_local_skill_document(
     Ok(LocalSkillPreview {
         skill_md_path: file.display().to_string(),
         skill_md_content: request.content,
+        display_description: edited.description,
+        translation_status: "original".into(),
     })
 }
 

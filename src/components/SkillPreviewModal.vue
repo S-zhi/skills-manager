@@ -22,8 +22,14 @@ const usedByText = computed(() => {
 });
 
 const descriptionText = computed(() => {
-  const value = props.skill?.description?.trim();
+  const value = props.preview?.displayDescription?.trim() || props.skill?.description?.trim();
   return value || t("local.previewEmptyDescription");
+});
+
+const translationLabel = computed(() => {
+  const status = props.preview?.translationStatus;
+  if (!status || status === "original") return "";
+  return t(`local.translationStatus.${status}`);
 });
 
 function close() {
@@ -37,7 +43,7 @@ function close() {
       <div class="preview-modal">
         <div class="preview-header">
           <div class="preview-heading">
-            <div class="preview-badge">Skill</div>
+            <div class="badge-row"><div class="preview-badge">Skill</div><div v-if="translationLabel" class="translation-badge">{{ translationLabel }}</div></div>
             <h2 class="preview-title">{{ skill?.name ?? t("local.previewTitle") }}</h2>
             <p class="preview-description">{{ descriptionText }}</p>
           </div>
@@ -120,6 +126,10 @@ function close() {
   font-weight: 600;
   margin-bottom: 14px;
 }
+
+.badge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.badge-row .preview-badge { margin-bottom: 0; }
+.translation-badge { padding: 6px 10px; border-radius: 999px; background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid var(--color-success-border); font-size: 12px; font-weight: 600; }
 
 .preview-title {
   margin: 0;

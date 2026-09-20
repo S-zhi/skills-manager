@@ -150,6 +150,11 @@ export default {
     previewUsedBy: "Used By",
     previewPath: "Path",
     previewSkillMdPath: "SKILL.md",
+    translationStatus: {
+      cached: "Local translation",
+      translated: "Translated and cached locally",
+      unavailable: "Translation disabled"
+    },
     openDir: "Open Folder",
     deleteOne: "Delete",
     deleteSelected: "Delete selected ({count})",

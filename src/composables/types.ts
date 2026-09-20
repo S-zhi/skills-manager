@@ -42,6 +42,8 @@ export type LocalSkill = {
 export type LocalSkillPreview = {
   skillMdPath: string;
   skillMdContent: string;
+  displayDescription?: string;
+  translationStatus: "original" | "cached" | "translated" | "unavailable";
 };
 
 export type SkillLibraryEntry = {
@@ -188,6 +190,7 @@ export type TranslationSettingsView = {
   schemaVersion: number;
   revision: number;
   basic: {
+    enabled: boolean;
     provider: "azure" | "deepl" | "google" | "mymemory" | "libretranslate";
     endpoint: string;
     region: string;
@@ -195,6 +198,7 @@ export type TranslationSettingsView = {
     targetLanguage: string;
   };
   advanced: {
+    enabled: boolean;
     provider: "gemini" | "openai-compatible";
     baseUrl: string;
     model: string;

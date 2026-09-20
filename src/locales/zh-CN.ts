@@ -149,6 +149,11 @@ export default {
     previewUsedBy: "已关联编辑器",
     previewPath: "路径",
     previewSkillMdPath: "SKILL.md",
+    translationStatus: {
+      cached: "本地译文",
+      translated: "已翻译并保存到本地",
+      unavailable: "未启用翻译"
+    },
     openDir: "打开目录",
     deleteOne: "删除",
     deleteSelected: "删除选中 ({count})",
