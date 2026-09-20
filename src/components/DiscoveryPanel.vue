@@ -19,6 +19,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
+  (e: "back"): void;
   (e: "discover"): void;
   (e: "clear"): void;
   (e: "import", skills: DiscoveredSkill[]): void;
@@ -52,11 +53,16 @@ const allFilteredSelected = computed(
 watch(
   () => props.skills,
   (skills) => {
-    const available = new Set(skills.map((skill) => skill.path));
-    selectedPaths.value = selectedPaths.value.filter((path) => available.has(path));
+    selectedPaths.value = skills.map((skill) => skill.path);
   },
   { deep: true }
 );
+
+const importModeLabel = computed(() => {
+  if (props.skills.length === 1) return t("discovery.singleMode");
+  if (props.skills.length > 1) return t("discovery.batchMode", { count: props.skills.length });
+  return "";
+});
 
 function toggleSelected(path: string, checked: boolean) {
   selectedPaths.value = checked
@@ -96,8 +102,20 @@ function importStatusLabel(result: SkillImportItemResult) {
 
 <template>
   <section class="panel">
-    <div class="panel-title">{{ t("discovery.title") }}</div>
-    <div class="hint">{{ t("discovery.hint") }}</div>
+    <div class="import-page-header">
+      <div>
+        <div class="panel-title">{{ t("local.import") }}</div>
+        <div class="hint">{{ t("discovery.hint") }}</div>
+      </div>
+      <div class="import-page-actions">
+        <button class="ghost" type="button" :disabled="loading || importing" @click="$emit('back')">
+          {{ t("discovery.back") }}
+        </button>
+        <button class="primary" type="button" :disabled="loading || importing" @click="$emit('discover')">
+          {{ loading ? t("local.discovering") : t("discovery.chooseFolder") }}
+        </button>
+      </div>
+    </div>
 
     <div class="storage-card">
       <div>
@@ -114,12 +132,9 @@ function importStatusLabel(result: SkillImportItemResult) {
       </button>
     </div>
 
-    <div class="actions discovery-actions">
-      <button class="primary" type="button" :disabled="loading || importing" @click="$emit('discover')">
-        {{ loading ? t("local.discovering") : t("local.discover") }}
-      </button>
+    <div v-if="rootPath" class="actions discovery-actions">
       <button
-        class="ghost"
+        class="primary"
         type="button"
         :disabled="selectedSkills.length === 0 || importing"
         @click="$emit('import', selectedSkills)"
@@ -129,7 +144,6 @@ function importStatusLabel(result: SkillImportItemResult) {
           : t("discovery.importSelected", { count: selectedSkills.length }) }}
       </button>
       <button
-        v-if="rootPath"
         class="ghost"
         type="button"
         :disabled="loading || importing"
@@ -143,19 +157,21 @@ function importStatusLabel(result: SkillImportItemResult) {
       <div>
         <div class="summary-title">{{ t("local.discoveryTitle", { count: skills.length }) }}</div>
         <div class="card-link">{{ rootPath }}</div>
+        <div v-if="importModeLabel" class="mode-label">{{ importModeLabel }}</div>
       </div>
       <div class="selection-actions">
         <span class="selection-count">
           {{ t("discovery.selectedCount", { count: selectedSkills.length }) }}
         </span>
-        <button
-          class="ghost"
-          type="button"
-          :disabled="filteredSkills.length === 0 || importing || allFilteredSelected"
-          @click="toggleAllFiltered(true)"
-        >
+        <label class="checkbox select-results">
+          <input
+            type="checkbox"
+            :checked="allFilteredSelected"
+            :disabled="filteredSkills.length === 0 || importing"
+            @change="toggleAllFiltered(($event.target as HTMLInputElement).checked)"
+          />
           {{ t("discovery.selectVisible") }}
-        </button>
+        </label>
         <button
           class="ghost"
           type="button"
@@ -248,6 +264,8 @@ function importStatusLabel(result: SkillImportItemResult) {
 .discovery-summary,
 .filters,
 .discovery-actions,
+.import-page-header,
+.import-page-actions,
 .skill-heading,
 .badges {
   display: flex;
@@ -269,6 +287,33 @@ function importStatusLabel(result: SkillImportItemResult) {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.import-page-header {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.import-page-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mode-label {
+  width: fit-content;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 11px;
+}
+
+.select-results {
+  white-space: nowrap;
 }
 
 .selection-count {
@@ -383,11 +428,17 @@ function importStatusLabel(result: SkillImportItemResult) {
 }
 
 @media (max-width: 720px) {
+  .import-page-header,
   .storage-card,
   .discovery-summary,
   .filters {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .import-page-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .selection-actions {

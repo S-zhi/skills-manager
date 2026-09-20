@@ -27,7 +27,7 @@ export function useSkillsManager() {
     string,
     { timestamp: number; data: SearchResponse }
   >();
-  const activeTab = ref<"local" | "packages" | "discover" | "market" | "ide" | "projects" | "settings" | "trash">("local");
+  const activeTab = ref<"local" | "import" | "packages" | "market" | "ide" | "projects" | "settings" | "trash">("local");
 
   const query = ref("");
   const marketSource = ref<"cached" | "skillsmp">("cached");
@@ -709,59 +709,6 @@ export function useSkillsManager() {
     uninstallTargetPaths.value = [];
   }
 
-  async function importLocalSkill() {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        directory: true,
-        multiple: true,
-        title: t("local.selectSkillDir")
-      });
-
-      if (!selected) return;
-
-      const paths = Array.isArray(selected) ? selected : [selected];
-      if (paths.length === 0) return;
-
-      busy.value = true;
-      busyText.value = t("messages.importing");
-
-      let successCount = 0;
-      let failCount = 0;
-      let lastError = "";
-
-      for (const path of paths) {
-        try {
-          await invoke("import_local_skill", {
-            request: {
-              sourcePath: path
-            }
-          });
-          successCount++;
-        } catch (err) {
-          failCount++;
-          lastError = err instanceof Error ? err.message : String(err);
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(t("messages.imported", { success: successCount, failed: failCount }));
-      } else {
-        toast.error(
-          t("messages.imported", { success: 0, failed: failCount }) +
-          (paths.length === 1 ? `: ${lastError}` : "")
-        );
-      }
-
-      await scanLocalSkills();
-    } catch (err) {
-      toast.error(getErrorMessage(err, t("errors.importFailed")));
-    } finally {
-      busy.value = false;
-      busyText.value = "";
-    }
-  }
-
   async function discoverSkillsInDirectory() {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
@@ -998,7 +945,6 @@ export function useSkillsManager() {
     openDeleteLocalModal,
     confirmUninstall,
     cancelUninstall,
-    importLocalSkill,
     discoverSkillsInDirectory,
     clearDiscoveredSkills,
     importDiscoveredSkills,

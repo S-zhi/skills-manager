@@ -124,7 +124,6 @@ const {
   closeInstallModal,
   confirmUninstall,
   cancelUninstall,
-  importLocalSkill,
   discoverSkillsInDirectory,
   clearDiscoveredSkills,
   importDiscoveredSkills,
@@ -224,18 +223,11 @@ async function handleLinkSkills(projectId: string) {
     <header class="header">
       <div class="brand"><span class="brand-mark">S</span><div>Skill Manager<small>YOUR PERSONAL TOOLKIT</small></div></div>
       <div class="tabs">
-        <button class="tab" :class="{ active: activeTab === 'local' }" @click="activeTab = 'local'">
+        <button class="tab" :class="{ active: activeTab === 'local' || activeTab === 'import' }" @click="activeTab = 'local'">
           <AppIcon name="library" />
           {{ t("app.tabs.local") }}
         </button>
         <button class="tab" :class="{ active: activeTab === 'packages' }" @click="activeTab = 'packages'"><AppIcon name="package" />{{ t('packages.title') }}</button>
-        <button
-          class="tab"
-          :class="{ active: activeTab === 'discover' }"
-          @click="activeTab = 'discover'"
-        >
-          <AppIcon name="discover" />{{ t("app.tabs.discover") }}
-        </button>
         <button
           class="tab"
           :class="{ active: activeTab === 'market' }"
@@ -326,13 +318,13 @@ async function handleLinkSkills(projectId: string) {
           @open-dir="openSkillDirectory"
           @create="showCreateSkillModal = true"
           @refresh="scanLocalSkills"
-          @import="importLocalSkill"
+          @import="activeTab = 'import'"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
         />
       </template>
 
-      <template v-else-if="activeTab === 'discover'">
+      <template v-else-if="activeTab === 'import'">
         <DiscoveryPanel
           :skills="discoveredSkills"
           :root-path="discoveryRoot"
@@ -340,6 +332,7 @@ async function handleLinkSkills(projectId: string) {
           :importing="discoveryImporting"
           :import-results="discoveryImportResults"
           :storage="managerStorage"
+          @back="activeTab = 'local'"
           @discover="discoverSkillsInDirectory"
           @clear="clearDiscoveredSkills"
           @import="importDiscoveredSkills"

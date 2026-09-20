@@ -162,8 +162,12 @@ export default {
     unused: "Not linked"
   },
   discovery: {
-    title: "Discover & Import",
-    hint: "Recursively scan a folder for SKILL.md files. Discovery is read-only; files are copied only after you select skills and click Import.",
+    title: "Import Skill",
+    hint: "Choose a Skill folder or a parent folder containing multiple Skills. The app detects single or batch import automatically, selects all results by default, and copies files only after confirmation.",
+    back: "Back to My Skills",
+    chooseFolder: "Choose folder",
+    singleMode: "Single import detected",
+    batchMode: "Batch import detected · {count} Skills",
     storageTitle: "Skill Manager storage",
     storageLoading: "Loading storage location...",
     openStorage: "Open repository",

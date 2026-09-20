@@ -161,8 +161,12 @@ export default {
     unused: "未关联"
   },
   discovery: {
-    title: "发现与导入",
-    hint: "递归扫描所选目录中的所有 SKILL.md。扫描是只读操作，只有选中并点击导入后才会复制到统一仓库。",
+    title: "导入 Skill",
+    hint: "选择 Skill 文件夹或包含多个 Skills 的上级目录，系统会自动识别单个或批量导入。扫描后默认全选，确认后才会复制到统一仓库。",
+    back: "返回我的 Skills",
+    chooseFolder: "选择文件夹",
+    singleMode: "已识别为单个导入",
+    batchMode: "已识别为批量导入 · {count} 个 Skill",
     storageTitle: "Skill Manager 统一存储目录",
     storageLoading: "正在加载存储目录...",
     openStorage: "打开统一仓库",
