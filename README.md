@@ -24,9 +24,9 @@ Restore preserves files/UUIDs and refuses occupied destinations or duplicate UUI
 
 Settings is now split into four focused pages: **Updates, Cloud backup, Appearance, and Translation**. Update checks and the in-app GitHub link now target the current `S-zhi/skills-manager` repository.
 
-**Settings → Translation** has two configuration layers. The basic layer supports Azure Translator, DeepL, Google Cloud Translation, MyMemory, and LibreTranslate. The advanced layer supports Gemini and OpenAI-compatible services with model, base URL, temperature, and Markdown/YAML/code-structure preservation options. This release adds the **configuration layer**; translation actions will be connected to skill editing and batch workflows later, so it does not yet automatically rewrite a Skill.
+**Settings → Translation** has two configuration layers. The basic layer supports Azure Translator, DeepL, Google Cloud Translation, MyMemory, and LibreTranslate. The advanced layer supports Gemini, OpenAI Chat Completions, and Anthropic Messages, with a custom Base URL for relay services, model, temperature, and an editable System Prompt. The active engine is used for Skill preview translation and results are cached locally.
 
-Non-sensitive values are stored at `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json` without changing the `Skill Manager\Skills` layout. API keys are **kept only in process memory, never written to JSON, and never returned from the backend to the UI**; enter them again after restarting the app. Remote endpoints must use HTTPS. HTTP is accepted only for a local LibreTranslate server on localhost/127.0.0.1. MyMemory's public anonymous service is typically limited to about 5,000 characters/day, may change, and should not receive private Skill content.
+Non-sensitive values are stored at `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json` without changing the `Skill Manager\Skills` layout. API keys are **kept only in process memory, never written to JSON, and never returned from the backend to the UI**; enter them again after restarting the app. Remote endpoints must use HTTPS; local relay endpoints on localhost/127.0.0.1 may use HTTP. MyMemory's public anonymous service is typically limited to about 5,000 characters/day, may change, and should not receive private Skill content.
 
 The updater manifest now points to the current repository. New `latest.json` manifests and installers must still be signed with the private key matching the public key in `src-tauri/tauri.conf.json`. If the signing key changes, update the embedded public key as well or clients will reject the update.
 
@@ -66,7 +66,6 @@ A cross-platform AI Skills Manager. Search the bundled directory or the live Ski
 - 🔎 **Discovery & Batch Import**: Recursively find `SKILL.md` files, validate them, select multiple results, and import them
 - 🚀 **One-Click Installation**: Install unified local skills to target IDEs in seconds via symlinks
 - 🛠️ **Multi-Dimensional Management**: Browse skills per IDE, uninstall cleanly and safely
-- ⚙️ **Project Management**: Manage projects and mount skills to projects, configure IDEs for each project
 
 ## 🎯 Natively Supported IDEs (Alphabetical Order)
 
@@ -167,13 +166,13 @@ Select **New Skill** in the sidebar, enter a name, description and Markdown inst
 
 ### Skill packages
 
-The **My Skills** page includes package management: create a package with a name and description, search/select managed skills, edit its members, or delete the package. Each package has its own UUID, member skill UUIDs, and creation/update timestamps. Available members can be installed to IDEs or exported together as a ZIP. Empty packages are supported.
+The **My Skills** page displays Skills in collapsible groups. Create or rename packages there, assign one Skill from its More menu, assign selected Skills in bulk, and drag the blue handle to reorder packages. Uncategorized Skills stay in the built-in **Uncategorized** group. Package numbers start at 1.
 
-Packages are logical groups. A skill may belong to multiple packages, and same-name skills are distinguished by UUID. No skill files are moved, copied, or edited by package operations. The existing directory layout stays unchanged; configuration is stored in `%USERPROFILE%\Skill Manager\.metadata\skill-packages.json`, containing `schemaVersion`, `revision`, and `packages` (each with `id`, `name`, `description`, `skillUuids`, `createdAt`, `updatedAt`). Timestamps use Unix seconds.
+Packages are logical groups and each Skill belongs to at most one package. Reassigning a Skill removes it from its previous package. No Skill files are moved, copied, or edited by package operations. Configuration is stored in `%USERPROFILE%\Skill Manager\.metadata\skill-packages.json` using schema v2; every package has an immutable UUID plus name, description, member UUIDs, display position, and timestamps.
 
-Deleting a package preserves its member files. Deleted skills remain as missing references until manually removed from the package. Invalid or unsupported configuration is reported without overwriting the file. If an edit conflict occurs, cancel editing, refresh the package list, and edit again.
+Deleting a package preserves its member files and returns them to Uncategorized. Existing schema-v1 data migrates deterministically; if a Skill belonged to several packages, its first package in the saved order wins.
 
-Package ZIP export contains available skill files only, not package configuration. Configuration import, online publishing, dependency resolution, and package version management are outside this release.
+Package configuration import, online publishing, dependency resolution, and package version management are outside this release.
 
 ### ⌨️ 4) IDE Browser
 

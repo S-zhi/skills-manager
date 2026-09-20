@@ -9,14 +9,20 @@ export default {
     identityHint: 'A unique UUID is generated. Existing folders are never overwritten.', success: 'Skill created', view: 'View My Skills', another: 'Create another', close: 'Close new skill dialog'
   },
   packages: {
-    title: "Skill packages", hint: "Group managed skills by purpose. A skill can belong to multiple packages without moving its files.",
-    create: "Create package", edit: "Edit package", choose: "Choose package", empty: "No packages yet. Create one to group your skills.",
+    title: "Skill packages", hint: "Group managed skills by purpose. Each Skill belongs to at most one package.",
+    create: "New Skill package", edit: "Edit package", rename: "Rename", choose: "Choose package", empty: "No packages yet. Create one to group your skills.",
     name: "Package name", description: "Description", members: "Member skills", search: "Search skill name, UUID or path",
     save: "Save", cancel: "Cancel", delete: "Delete package", confirmDelete: "Confirm deletion",
     deleteConfirm: "Delete this package? Only the grouping is removed; skill files are preserved.",
     saved: "Package saved", deleted: "Package deleted", loading: "Loading…",
     missing: "Missing member (uncheck in the editor to remove)", noMembers: "This package has no members. Edit it to add skills.",
-    install: "Install available members", export: "Export available members (ZIP)"
+    install: "Install available members", export: "Export available members (ZIP)",
+    uncategorized: "Uncategorized", assignOne: "Set Skill package", assignSelected: "Move to package ({count})",
+    assignTitle: "Classify {count} Skills", assign: "Apply", assigned: "Skill classification updated",
+    singleOwnerHint: "Skills are removed from their previous package. Choose Uncategorized to clear assignment.",
+    dragHint: "Drag the blue handle to reorder groups",
+    moreActions: "More group actions",
+    systemGroupHint: "Default system group. It cannot be renamed or deleted."
   },
   app: {
     tabs: {
@@ -24,7 +30,6 @@ export default {
       discover: "Discover & Import",
       market: "Market",
       ide: "IDE Browser",
-      projects: "Projects",
       settings: "Settings"
     },
     header: {
@@ -146,6 +151,10 @@ export default {
     },
     preview: "Preview",
     previewTitle: "Skill Preview",
+    previewVersion: "Preview version",
+    previewOriginal: "English original",
+    previewTranslated: "Chinese translation",
+    previewTranslationUnavailable: "Translation unavailable; showing original",
     previewEmptyDescription: "No description",
     previewUsedBy: "Used By",
     previewPath: "Path",
@@ -197,7 +206,7 @@ export default {
   },
   ide: {
     title: "IDE Browser",
-    switchHint: "Switch IDE to view its skills.",
+    switchHint: "Only detected local IDEs and existing shared directories are shown.",
     total: "{count} skills",
     selectAll: "Select all",
     addHint: "Add custom IDE (name + relative or absolute path).",
@@ -207,6 +216,11 @@ export default {
     deleteButton: "Remove",
     loading: "Loading...",
     emptyHint: "No skills for this IDE",
+    noDetectedLocations: "No installed IDE or shared directory was detected. You can still bind a custom path below.",
+    detectedIde: "Detected IDE · Skill path",
+    commonSource: "Shared directory",
+    commonDirectory: "Shared",
+    directoryNotInitialized: "Skill directory not initialized",
     sourceLink: "Linked",
     sourceLocal: "Local",
     unmanaged: "Unmanaged",
@@ -220,12 +234,8 @@ export default {
   installModal: {
     selectTargetTitle: "Select Install Target",
     globalIde: "Global IDE",
-    globalIdeDesc: "Install to global IDE directory, available to all projects",
-    project: "Project",
-    projectDesc: "Install to project directory, available only to this project",
-    noProjects: "No projects",
+    globalIdeDesc: "Install to a global IDE directory",
     installToIde: "Install to IDE",
-    installToProject: "Install to Project",
     cancel: "Cancel"
   },
   uninstallModal: {
@@ -257,8 +267,7 @@ export default {
     handled: "Handled {linked} targets, skipped {skipped} targets.",
     imported: "Successfully imported {success} skills, failed {failed}.",
     batchImported: "Import complete: {imported} added, {skipped} skipped, {failed} failed.",
-    exported: "Exported to {path}",
-    selectSkillsForProject: "Select skills to install for project {name}"
+    exported: "Exported to {path}"
   },
   errors: {
     fillIde: "Please fill in IDE name and directory.",
@@ -281,8 +290,7 @@ export default {
     adoptFailed: "Failed to add to central management.",
     unsupportedManualUrl: "Only GitHub repository URLs, GitHub subdirectory URLs, or ZIP download URLs are supported.",
     manualSkillNameRequired: "Could not infer a skill name from the URL. Please enter one manually.",
-    invalidPath: "Path must be a relative path or a valid absolute path.",
-    projectNoIdeTargets: "Project has no IDE targets configured. Please configure first."
+    invalidPath: "Path must be a relative path or a valid absolute path."
   },
   update: {
     available: "New version available: {version}",
@@ -308,33 +316,5 @@ export default {
     done: "Done",
     error: "Download failed",
     retry: "Retry"
-  },
-  projects: {
-    title: "Projects",
-    hint: "Configure separate Skills environments for different projects.",
-    add: "Add Project",
-    addTitle: "Add New Project",
-    addHint: "Select project folder and enter project name.",
-    pathPlaceholder: "e.g., /Users/name/my-project or C:\\Projects\\my-project",
-    namePlaceholder: "e.g., My Project",
-    remove: "Remove",
-    select: "Select",
-    deselect: "Deselect",
-    configure: "Configure",
-    configureTitle: "Configure Project IDE Targets",
-    linkSkills: "Link Skills",
-    openDirectory: "Open Directory",
-    emptyHint: "No projects yet. Click the button above to add one.",
-    projectPath: "Project Path",
-    projectName: "Project Name",
-    selectIdeTargets: "Select IDE Targets",
-    configureHint: "Select IDEs that this project needs. Skills will be linked to these IDE directories in the project.",
-    cancel: "Cancel",
-    save: "Save",
-    ideTargets: "IDE Targets: {count}",
-    detected: "Detected: {count}",
-    selectFolder: "Select Project Folder",
-    selectFolderButton: "Select Folder",
-    untitled: "Untitled Project"
   }
 };

@@ -23,25 +23,5 @@ export const defaultIdeOptions: IdeOption[] = [
  */
 export const STORAGE_KEYS = {
   IDE_OPTIONS: "skillsManager.ideOptions",
-  INSTALL_TARGETS: "skillsManager.lastInstallTargets",
-  PROJECTS: "skillsManager.projects"
+  INSTALL_TARGETS: "skillsManager.lastInstallTargets"
 } as const;
-
-
-/**
- * IDE directory mappings for project-level skills
- */
-export const ideDirMappings: Array<{ label: string; path: string }> = [
-  { label: "Antigravity", path: ".gemini/antigravity/skills" },
-  { label: "Claude Code", path: ".claude/skills" },
-  { label: "CodeBuddy", path: ".codebuddy/skills" },
-  { label: "Codex", path: ".codex/skills" },
-  { label: "Cursor", path: ".cursor/skills" },
-  { label: "Kiro", path: ".kiro/skills" },
-  { label: "OpenClaw", path: ".openclaw/skills" },
-  { label: "OpenCode", path: ".opencode/skills" },
-  { label: "Qoder", path: ".qoder/skills" },
-  { label: "Trae", path: ".trae/skills" },
-  { label: "VSCode", path: ".github/skills" },
-  { label: "Windsurf", path: ".windsurf/skills" }
-];

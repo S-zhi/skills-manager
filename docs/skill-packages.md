@@ -2,19 +2,19 @@
 
 ## 1. 包是什么
 
-Skill 包是托管 Skill 的逻辑分组，例如“写作工具包”。包有独立 UUID、名称、描述、成员 UUID 列表和创建/更新时间。同一 Skill 可以属于多个包；名称不是关联依据，Skill 改名后仍通过 UUID 关联。
+Skill 包是托管 Skill 的逻辑分组，例如“写作工具包”。包有独立 UUID、名称、描述、显示顺序、成员 UUID 列表和创建/更新时间。每个 Skill 最多属于一个包；名称不是关联依据，Skill 改名后仍通过 UUID 关联。未归包 Skill 属于虚拟的“未分类”组；该系统组可参与排序，但不可重命名或删除。
 
 ## 2. 存储
 
-沿用现有目录，仅新增 `%USERPROFILE%/Skill Manager/.metadata/skill-packages.json`。不创建包目录，不移动、复制或改写 SKILL.md。配置包含 schemaVersion、revision、packages，便于未来升级与防止并发覆盖。
+沿用现有目录，仅新增 `%USERPROFILE%/Skill Manager/.metadata/skill-packages.json`。不创建包目录，不移动、复制或改写 SKILL.md。配置包含 schemaVersion、revision、uncategorizedPosition、packages，便于未来升级与防止并发覆盖。
 
-每个包：id、name、description、skillUuids、createdAt、updatedAt。时间使用 Unix 秒。名称去掉首尾空格且不能为空（最多 100 字符），描述最多 4000 字符。包名称允许重复，UUID 唯一。
+schema v3 中每个包包含 id、name、description、skillUuids、position、createdAt、updatedAt；uncategorizedPosition 单独保存系统组位置。时间使用 Unix 秒。名称去掉首尾空格且不能为空（最多 100 字符），描述最多 4000 字符。包名称允许重复，UUID 唯一且不可变。
 
 ## 3. 使用流程
 
-在“我的 Skills”创建包 → 填名称和描述 → 搜索并勾选托管 Skill → 保存。
+在“我的 Skills”创建包 → 从单个 Skill 的“更多”或批量工具栏选择包 → 保存。包括“未分类”在内的所有分组都可用蓝色把手调整顺序；普通包可折叠，并可从三点菜单重命名或删除，显示序号从 1 开始且不受“未分类”位置影响。描述有值时在标题行内展示，无值时不占用描述区域。
 
-选择包可查看成员并使用现有批量安装和导出。编辑包可增减成员；删除包仅删除配置中的分组。空包允许保存。已删除的成员仍保留 UUID 引用并标记缺失，用户可手动移除，避免默默丢失分组信息。
+重新归类会从其他包移除对应 Skill。删除包仅删除分组配置，成员回到“未分类”；空包允许保存。新建和新导入的 Skill 没有归属记录，因此默认进入“未分类”。
 
 ## 4. 数据保护
 
@@ -22,6 +22,6 @@ Skill 包是托管 Skill 的逻辑分组，例如“写作工具包”。包有�
 
 ## 5. 验证与边界
 
-验证包的创建、编辑、删除与重新加载；同名 Skill 按 UUID 区分；缺失成员保留；非法成员与旧 revision 拒绝；损坏配置保持原样。执行 Rust 测试和前端构建。
+验证包的创建、重命名、删除、单归属、批量归类、完整分组顺序调整与重新加载；非法成员、重复/缺失排序项与旧 revision 拒绝；损坏配置保持原样。schema v1/v2 自动迁移，v1 重复归属按原包顺序保留第一个。执行 Rust 测试和前端构建。
 
-本版不包括包分享格式、在线包市场、版本发布或自动依赖安装。包导出复用现有 Skill ZIP 导出，不包含包配置。
+本版不包括包分享格式、在线包市场、版本发布或自动依赖安装。

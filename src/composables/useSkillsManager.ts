@@ -6,10 +6,9 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useToast } from "./useToast";
 import type {
   RemoteSkill, InstallResult, LocalSkill,
-  IdeSkill, Overview, LinkTarget, DownloadTask, ProjectConfig, DiscoveredSkill,
-  ManagerStorageInfo, BatchImportResult, SkillImportItemResult
+  IdeSkill, Overview, LinkTarget, DownloadTask, DiscoveredSkill,
+  ManagerStorageInfo, BatchImportResult, SkillImportItemResult, IdeBrowseLocation
 } from "./types";
-import { buildProjectLinkTargets } from "./projectTargets";
 import { useIdeConfig } from "./useIdeConfig";
 import {
   isSafeRelativePath,
@@ -27,7 +26,7 @@ export function useSkillsManager() {
     string,
     { timestamp: number; data: SearchResponse }
   >();
-  const activeTab = ref<"local" | "packages" | "market" | "ide" | "projects" | "settings" | "trash">("local");
+  const activeTab = ref<"local" | "market" | "ide" | "settings" | "trash">("local");
 
   const query = ref("");
   const marketSource = ref<"cached" | "skillsmp">("cached");
@@ -46,6 +45,7 @@ export function useSkillsManager() {
   // Local Skills
   const localSkills = ref<LocalSkill[]>([]);
   const ideSkills = ref<IdeSkill[]>([]);
+  const ideBrowseLocations = ref<IdeBrowseLocation[]>([]);
   const localLoading = ref(false);
   const discoveredSkills = ref<DiscoveredSkill[]>([]);
   const discoveryRoot = ref("");
@@ -99,7 +99,7 @@ export function useSkillsManager() {
     customIdeOptions,
     refreshIdeOptions,
     addCustomIde: doAddCustomIde,
-    removeCustomIde,
+    removeCustomIde: doRemoveCustomIde,
     loadLastInstallTargets,
     saveLastInstallTargets
   } = useIdeConfig();
@@ -111,6 +111,33 @@ export function useSkillsManager() {
     if (success) {
       void scanLocalSkills();
     }
+  }
+
+  function removeCustomIde(label: string) {
+    doRemoveCustomIde(label);
+    void scanLocalSkills();
+  }
+
+  async function refreshIdeBrowseLocations(): Promise<void> {
+    ideBrowseLocations.value = await invoke<IdeBrowseLocation[]>("detect_ide_locations", {
+      request: {
+        ideDirs: ideOptions.value.map((item) => ({
+          label: item.label,
+          relativeDir: item.globalDir
+        }))
+      }
+    });
+
+    if (!ideBrowseLocations.value.some((item) => item.label === selectedIdeFilter.value)) {
+      selectedIdeFilter.value = ideBrowseLocations.value[0]?.label ?? "";
+    }
+  }
+
+  function currentBrowseDirectories() {
+    return ideBrowseLocations.value.map((item) => ({
+      label: item.label,
+      relativeDir: item.relativeDir
+    }));
   }
 
   const filteredIdeSkills = computed(() =>
@@ -439,13 +466,11 @@ export function useSkillsManager() {
     localLoading.value = true;
 
     try {
+      await refreshIdeBrowseLocations();
       const response = (await invoke("scan_overview", {
         request: {
           projectDir: null,
-          ideDirs: ideOptions.value.map((item) => ({
-            label: item.label,
-            relativeDir: item.globalDir
-          }))
+          ideDirs: currentBrowseDirectories()
         }
       })) as Overview;
       localSkills.value = response.managerSkills;
@@ -495,58 +520,7 @@ export function useSkillsManager() {
     saveLastInstallTargets(next);
   }
 
-  async function confirmInstallToIde(installTarget: "ide" | "project", targetIds: string[], projects?: ProjectConfig[]) {
-    if (installTarget === "project") {
-      // Project installation
-      if (!projects || projects.length === 0) {
-        toast.error("No projects available");
-        showInstallModal.value = false;
-        installTargetSkills.value = [];
-        return;
-      }
-      
-      if (installTargetSkills.value.length === 0 || targetIds.length === 0) {
-        toast.error(t("errors.selectAtLeastOne"));
-        return;
-      }
-      if (installingId.value) return;
-      installingId.value = installTargetSkills.value.length === 1 ? installTargetSkills.value[0].id : "__batch__";
-      busy.value = true;
-      busyText.value = t("messages.installing");
-
-      try {
-        let totalLinked = 0;
-        let totalSkipped = 0;
-        
-        // Get selected projects
-        const selectedProjects = projects.filter(p => targetIds.includes(p.id));
-        
-        // Install to project directories
-        for (const skill of installTargetSkills.value) {
-          for (const project of selectedProjects) {
-            for (const ideLabel of project.ideTargets) {
-              const result = await linkSkillToProjectInternal(skill, project, ideLabel, true, true);
-              totalLinked += result.linked.length;
-              totalSkipped += result.skipped.length;
-            }
-          }
-        }
-        
-        toast.success(t("messages.handled", { linked: totalLinked, skipped: totalSkipped }));
-        await scanLocalSkills();
-        showInstallModal.value = false;
-        installTargetSkills.value = [];
-      } catch (err) {
-        toast.error(getErrorMessage(err, t("errors.installFailed")));
-      } finally {
-        installingId.value = null;
-        busy.value = false;
-        busyText.value = "";
-      }
-      return;
-    }
-    
-    // IDE installation (existing logic)
+  async function confirmInstallToIde(targetIds: string[]) {
     if (installTargetSkills.value.length === 0 || targetIds.length === 0) {
       toast.error(t("errors.selectAtLeastOne"));
       return;
@@ -580,37 +554,6 @@ export function useSkillsManager() {
       busy.value = false;
       busyText.value = "";
     }
-  }
-
-  async function linkSkillToProjectInternal(
-    skill: LocalSkill,
-    project: ProjectConfig,
-    ideLabel: string,
-    skipScan = false,
-    suppressToast = false
-  ) {
-    const linkTargets = buildProjectLinkTargets(project, ideLabel);
-    if (linkTargets.length === 0) {
-      throw new Error(`${t("errors.selectValidIde")} (${project.name}: ${ideLabel})`);
-    }
-    const result = (await invoke("link_local_skill", {
-      request: {
-        skillPath: skill.path,
-        skillName: skill.name,
-        linkTargets,
-        projectDir: project.path
-      }
-    })) as InstallResult;
-
-    const linkedCount = result.linked.length;
-    const skippedCount = result.skipped.length;
-    if (!suppressToast) {
-      toast.success(t("messages.handled", { linked: linkedCount, skipped: skippedCount }));
-    }
-    if (!skipScan) {
-      await scanLocalSkills();
-    }
-    return result;
   }
 
   function closeInstallModal() {
@@ -665,10 +608,7 @@ export function useSkillsManager() {
               request: {
                 targetPath,
                 projectDir: null,
-                ideDirs: ideOptions.value.map((item) => ({
-                  label: item.label,
-                  relativeDir: item.globalDir
-                }))
+                ideDirs: currentBrowseDirectories()
               }
             });
             successCount++;
@@ -903,6 +843,7 @@ export function useSkillsManager() {
     discoveryImportResults,
     managerStorage,
     ideOptions,
+    ideBrowseLocations,
     selectedIdeFilter,
     customIdeName,
     customIdeDir,

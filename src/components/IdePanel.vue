@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { IdeSkill, IdeOption } from "../composables/types";
+import type { IdeBrowseLocation, IdeSkill, IdeOption } from "../composables/types";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
 const props = defineProps<{
-  ideOptions: IdeOption[];
+  browseLocations: IdeBrowseLocation[];
   selectedIdeFilter: string;
   customIdeName: string;
   customIdeDir: string;
@@ -42,6 +42,10 @@ watch(
 
 const selectedSkills = computed(() =>
   props.filteredIdeSkills.filter((skill) => selectedIds.value.includes(skill.id))
+);
+
+const selectedLocation = computed(() =>
+  props.browseLocations.find((location) => location.label === props.selectedIdeFilter)
 );
 
 const selectedUnmanagedSkills = computed(() =>
@@ -98,13 +102,32 @@ function adoptSelected() {
     <div class="hint">{{ t("ide.switchHint") }}</div>
     <div class="ide-filter-grid">
       <button
-        v-for="option in ideOptions"
-        :key="option.id"
+        v-for="option in browseLocations"
+        :key="`${option.kind}:${option.resolvedPath}`"
         class="ghost ide-filter-btn"
         :class="{ active: selectedIdeFilter === option.label }"
         @click="$emit('update:selectedIdeFilter', option.label)"
       >
         {{ option.label }}
+        <span v-if="option.kind === 'common'" class="source-kind">{{ t("ide.commonDirectory") }}</span>
+      </button>
+    </div>
+    <div v-if="!localLoading && browseLocations.length === 0" class="empty-locations">
+      {{ t("ide.noDetectedLocations") }}
+    </div>
+    <div v-if="selectedLocation" class="location-summary">
+      <div>
+        <div class="location-title">
+          {{ selectedLocation.kind === "common" ? t("ide.commonSource") : t("ide.detectedIde") }}
+        </div>
+        <div class="card-link">{{ selectedLocation.resolvedPath }}</div>
+      </div>
+      <button
+        class="ghost"
+        :disabled="!selectedLocation.directoryExists"
+        @click="$emit('openDir', selectedLocation.resolvedPath)"
+      >
+        {{ selectedLocation.directoryExists ? t("ide.openDir") : t("ide.directoryNotInitialized") }}
       </button>
     </div>
     <div class="hint">{{ t("ide.addHint") }}</div>
@@ -150,7 +173,7 @@ function adoptSelected() {
     </div>
 
     <div v-if="localLoading" class="hint">{{ t("ide.loading") }}</div>
-    <div v-if="!localLoading && filteredIdeSkills.length === 0" class="hint">{{ t("ide.emptyHint") }}</div>
+    <div v-if="!localLoading && selectedLocation && filteredIdeSkills.length === 0" class="hint">{{ t("ide.emptyHint") }}</div>
     <div v-if="filteredIdeSkills.length > 0" class="cards">
       <article
         v-for="(skill, index) in filteredIdeSkills"
@@ -218,6 +241,38 @@ function adoptSelected() {
   background: var(--color-primary-bg);
   border-color: var(--color-primary-bg);
   color: var(--color-primary-text);
+}
+
+.source-kind {
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.empty-locations {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px dashed var(--color-panel-border);
+  border-radius: 10px;
+  color: var(--color-muted);
+}
+
+.location-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-card-border);
+  border-radius: 10px;
+  background: var(--color-card-bg);
+}
+
+.location-title {
+  margin-bottom: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .card.unmanaged {

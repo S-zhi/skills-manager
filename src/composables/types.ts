@@ -41,6 +41,7 @@ export type LocalSkill = {
 
 export type LocalSkillPreview = {
   skillMdPath: string;
+  originalContent: string;
   skillMdContent: string;
   displayDescription?: string;
   translationStatus: "original" | "cached" | "translated" | "unavailable";
@@ -63,6 +64,7 @@ export type SkillPackage = {
   name: string;
   description: string;
   skillUuids: string[];
+  position: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -70,6 +72,7 @@ export type SkillPackage = {
 export type SkillPackageStore = {
   schemaVersion: number;
   revision: number;
+  uncategorizedPosition: number;
   packages: SkillPackage[];
 };
 
@@ -144,6 +147,15 @@ export type IdeOption = {
   globalDir: string;
 };
 
+export type IdeBrowseLocation = {
+  label: string;
+  relativeDir: string;
+  resolvedPath: string;
+  kind: "ide" | "common";
+  detectedBy: "skills-directory" | "configuration-directory" | "executable" | "installation-path" | "common-directory";
+  directoryExists: boolean;
+};
+
 /**
  * Link target for skill installation
  */
@@ -166,26 +178,6 @@ export type DownloadTask = {
   error?: string;
 };
 
-/**
- * IDE directory in a project
- */
-export type ProjectIdeDir = {
-  label: string;
-  relativeDir: string;
-  absolutePath: string;
-};
-
-/**
- * Project configuration
- */
-export type ProjectConfig = {
-  id: string;
-  name: string;
-  path: string;
-  ideTargets: string[];
-  detectedIdeDirs: ProjectIdeDir[];
-};
-
 export type TranslationSettingsView = {
   schemaVersion: number;
   revision: number;
@@ -199,11 +191,12 @@ export type TranslationSettingsView = {
   };
   advanced: {
     enabled: boolean;
-    provider: "gemini" | "openai-compatible";
+    provider: "gemini" | "openai" | "anthropic" | "openai-compatible";
     baseUrl: string;
     model: string;
     temperature: number;
     preserveStructure: boolean;
+    systemPrompt: string;
   };
   basicApiKeyConfigured: boolean;
   advancedApiKeyConfigured: boolean;

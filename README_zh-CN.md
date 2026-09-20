@@ -28,9 +28,9 @@
 
 “设置”已拆分为 **检查更新、云端备份、外观设置、翻译配置** 四个独立页面，不再把所有选项堆在同一长页面。检查更新和应用内 GitHub 链接指向当前仓库 `S-zhi/skills-manager`。
 
-“设置 → 翻译配置”提供两层配置：基础层支持 Azure Translator、DeepL、Google Cloud Translation、MyMemory 与 LibreTranslate；高级层支持 Gemini 和 OpenAI Compatible 服务，并可配置模型、Base URL、Temperature 及 Markdown/YAML/代码结构保护。当前版本完成的是**配置接入**，实际翻译动作后续会从 Skill 编辑或批处理流程调用，不应理解为已经自动改写 Skill。
+“设置 → 翻译配置”提供两层配置：基础层支持 Azure Translator、DeepL、Google Cloud Translation、MyMemory 与 LibreTranslate；高级层支持 Gemini、OpenAI Chat Completions 与 Anthropic Messages 协议，可自定义模型、Base URL（适配中转站）、Temperature 及 System Prompt。启用的引擎会用于 Skill 预览翻译，结果保存在本地缓存。
 
-非敏感设置写入 `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json`，不改变 `Skill Manager\Skills` 的文件布局。API Key **只保留在当前应用进程内存中，不写入 JSON，也不会从后端回传界面**；关闭应用后需要重新输入。远程地址必须使用 HTTPS，只有本机 `localhost` / `127.0.0.1` 的 LibreTranslate 服务允许 HTTP。MyMemory 的公共匿名服务通常约 5,000 字符/天，额度可能变化，不要用于私密 Skill 内容。
+非敏感设置写入 `%USERPROFILE%\Skill Manager\.metadata\translation-settings.json`，不改变 `Skill Manager\Skills` 的文件布局。API Key **只保留在当前应用进程内存中，不写入 JSON，也不会从后端回传界面**；关闭应用后需要重新输入。远程地址必须使用 HTTPS，本机 `localhost` / `127.0.0.1` 的中转服务允许 HTTP。MyMemory 的公共匿名服务通常约 5,000 字符/天，额度可能变化，不要用于私密 Skill 内容。
 
 更新清单地址已切换到当前仓库。发布新版本时，`latest.json` 和安装包仍必须使用与 `src-tauri/tauri.conf.json` 中公钥匹配的私钥签名；如果更换发布签名密钥，必须同时更新应用内公钥，否则客户端会拒绝更新。
 
@@ -74,7 +74,6 @@ Windows 使用随深浅色主题切换的简洁标题栏，显示名称为 **Ski
 - 🔎 **发现与批量导入**：递归发现任意目录中的 `SKILL.md`，检查规范后可多选导入
 - 🚀 **一键极速分发**：以系统软链接形式，将统一的本地 Skills 秒级安装至各个目标 IDE
 - 🛠️ **多维管理界面**：支持基于 IDE 的细粒度浏览、无痕安全卸载机制
-- ⚙️ **项目管理**：支持项目管理，将 skills 挂载到项目下，可以配置项目使用的 ide
 
 ## 🎯 原生支持的 IDE（按字母顺序）
 
@@ -179,28 +178,29 @@ description: Example
 
 ### Skill 包管理
 
-在“我的 Skills”顶部可创建、编辑、查看和删除 Skill 包。包包含名称、描述、独立 UUID、成员 Skill UUID 列表及创建/更新时间。先导入 Skill，再在包编辑器中搜索和勾选成员；支持全选当前结果、清空选择，以及对包内可用成员批量安装到 IDE 或导出 ZIP。空包也可以保存。
+“我的 Skills”按可折叠分组展示 Skill。可在页面顶部新建包、重命名包，在单个 Skill 的“更多”中设置归属，也可批量选择后归入一个包。拖动蓝色把手可调整包顺序；包的显示序号从 1 开始。未归包的新建或导入 Skill 自动显示在“未分类”。
 
-这是逻辑分组：同一 Skill 可以加入多个包，同名 Skill 通过 UUID 区分。现有 `Skills`、`Plugins` 等文件布局不变，也不会因为创建包改写 `SKILL.md`；唯一新增的持久文件是 `%USERPROFILE%\Skill Manager\.metadata\skill-packages.json`：
+这是逻辑分组：每个 Skill 最多属于一个包，重新归类会自动从原包移出。同名 Skill 通过 UUID 区分，文件目录不会移动，也不会改写 `SKILL.md`。配置保存在 `%USERPROFILE%\Skill Manager\.metadata\skill-packages.json`：
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 1,
   "packages": [{
     "id": "07316a93-3b5c-40ac-94af-83aad5d43efb",
     "name": "写作工具包",
     "description": "用于资料整理和文档写作",
     "skillUuids": ["550e8400-e29b-41d4-a716-446655440000"],
+    "position": 0,
     "createdAt": 1790000000,
     "updatedAt": 1790000000
   }]
 }
 ```
 
-删除包只删除分组配置，不删除成员文件。成员 Skill 被删除后，包保留引用并显示“成员缺失”，可在编辑时取消勾选移除。配置读取失败、格式损坏或版本不支持时会报错，不会覆盖已有配置。编辑冲突时，先取消编辑、刷新包列表，再重新编辑。
+删除包只删除分组配置，不删除成员文件，原成员会回到“未分类”。旧版 schema v1 会自动迁移；若旧数据中一个 Skill 属于多个包，则按原顺序保留第一个包的归属。配置损坏或版本不支持时会报错，不会覆盖已有配置。
 
-包导出目前复用 Skill ZIP 导出，只包含成员文件，不包含包配置；暂不支持包配置导入、在线发布、依赖解析或包版本管理。详细设计见 [Skill 包设计](docs/skill-packages.md)。
+暂不支持包配置导入、在线发布、依赖解析或包版本管理。详细设计见 [Skill 包设计](docs/skill-packages.md)。
 
 ### ⌨️ 4) IDE 纬度管理 (IDE Browse)
 

@@ -51,6 +51,7 @@ pub struct AdvancedTranslationConfig {
     pub model: String,
     pub temperature: f64,
     pub preserve_structure: bool,
+    pub system_prompt: String,
 }
 
 impl Default for AdvancedTranslationConfig {
@@ -62,6 +63,7 @@ impl Default for AdvancedTranslationConfig {
             model: "gemini-2.5-flash".into(),
             temperature: 0.2,
             preserve_structure: true,
+            system_prompt: "You translate Skill documents accurately. Return only the translated document. Preserve YAML keys, name, uuid, Markdown syntax, code blocks, commands, paths, URLs, placeholders, and technical identifiers exactly. Translate only human-readable prose.".into(),
         }
     }
 }
@@ -173,6 +175,13 @@ fn check_text(value: &str, field: &str, max: usize, required: bool) -> Result<()
     Ok(())
 }
 
+fn check_system_prompt(value: &str) -> Result<(), String> {
+    if value.trim().is_empty() || value.len() > 12000 || value.contains('\0') {
+        return Err("Invalid system prompt".into());
+    }
+    Ok(())
+}
+
 fn validate_endpoint(value: &str, allow_local_http: bool) -> Result<(), String> {
     let endpoint = value.trim().trim_end_matches('/');
     if endpoint.starts_with("https://") {
@@ -185,7 +194,7 @@ fn validate_endpoint(value: &str, allow_local_http: bool) -> Result<(), String> 
     {
         return Ok(());
     }
-    Err("Endpoint is required and must use HTTPS; only local LibreTranslate may use HTTP".into())
+    Err("Endpoint is required and must use HTTPS; only local services may use HTTP".into())
 }
 
 fn sanitize_request(
@@ -203,18 +212,21 @@ fn sanitize_request(
     {
         return Err("Unsupported basic translation provider".into());
     }
-    if !["gemini", "openai-compatible"].contains(&request.advanced.provider.as_str()) {
+    if !["gemini", "openai", "anthropic", "openai-compatible"]
+        .contains(&request.advanced.provider.as_str())
+    {
         return Err("Unsupported advanced model provider".into());
     }
     validate_endpoint(
         &request.basic.endpoint,
         request.basic.provider == "libretranslate",
     )?;
-    validate_endpoint(&request.advanced.base_url, false)?;
+    validate_endpoint(&request.advanced.base_url, true)?;
     check_text(&request.basic.region, "region", 128, false)?;
     check_text(&request.basic.source_language, "source language", 32, true)?;
     check_text(&request.basic.target_language, "target language", 32, true)?;
     check_text(&request.advanced.model, "model", 160, true)?;
+    check_system_prompt(&request.advanced.system_prompt)?;
     if !(0.0..=1.0).contains(&request.advanced.temperature) {
         return Err("Temperature must be between 0 and 1".into());
     }
@@ -258,11 +270,13 @@ fn cache_root(home: &Path) -> PathBuf {
     home.join("Skill Manager/.metadata/translations")
 }
 
-fn source_hash(content: &str, target_language: &str) -> String {
+fn source_hash(content: &str, target_language: &str, engine: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(content.as_bytes());
     hasher.update([0]);
     hasher.update(target_language.as_bytes());
+    hasher.update([0]);
+    hasher.update(engine.as_bytes());
     format!("{:x}", hasher.finalize())
 }
 
@@ -270,15 +284,19 @@ fn read_cached_translation(
     home: &Path,
     content: &str,
     target_language: &str,
+    engine: &str,
 ) -> Result<Option<String>, String> {
-    let hash = source_hash(content, target_language);
+    let hash = source_hash(content, target_language, engine);
     let path = cache_root(home).join(format!("{hash}.json"));
     match fs::read(path) {
         Ok(bytes) => {
             let Ok(entry) = serde_json::from_slice::<TranslationCacheEntry>(&bytes) else {
                 return Ok(None);
             };
-            if entry.source_hash == hash && entry.target_language == target_language {
+            if entry.source_hash == hash
+                && entry.target_language == target_language
+                && entry.engine == engine
+            {
                 Ok(Some(entry.content))
             } else {
                 Ok(None)
@@ -296,7 +314,7 @@ fn write_cached_translation(
     engine: &str,
     content: &str,
 ) -> Result<(), String> {
-    let hash = source_hash(source, target_language);
+    let hash = source_hash(source, target_language, engine);
     let root = cache_root(home);
     fs::create_dir_all(&root).map_err(|error| error.to_string())?;
     let path = root.join(format!("{hash}.json"));
@@ -461,6 +479,15 @@ fn clean_llm_translation(value: &str) -> String {
     trimmed.to_string()
 }
 
+fn chat_endpoint(base_url: &str, suffix: &str) -> String {
+    let base = base_url.trim_end_matches('/');
+    if base.ends_with("/v1") && suffix.starts_with("/v1/") {
+        format!("{}{}", base, &suffix[3..])
+    } else {
+        format!("{}{}", base, suffix)
+    }
+}
+
 fn translate_with_advanced(
     config: &AdvancedTranslationConfig,
     api_key: &str,
@@ -468,7 +495,8 @@ fn translate_with_advanced(
     target_language: &str,
 ) -> Result<String, String> {
     let instruction = format!(
-        "Translate the following Skill document into {target_language}. Return only the complete translated document. Preserve YAML keys, name, uuid, Markdown syntax, code blocks, commands, paths, URLs, placeholders, and technical identifiers exactly. Translate only human-readable prose."
+        "{}\n\nTarget language: {target_language}. Translate the following Skill document and return only the complete translated document.",
+        config.system_prompt.trim()
     );
     let agent = translation_agent();
     let endpoint = config.base_url.trim_end_matches('/');
@@ -487,9 +515,9 @@ fn translate_with_advanced(
                 }),
             )?
         }
-        "openai-compatible" => send_json(
+        "openai" | "openai-compatible" => send_json(
             agent
-                .post(&format!("{endpoint}/v1/chat/completions"))
+                .post(&chat_endpoint(endpoint, "/v1/chat/completions"))
                 .set("Authorization", &format!("Bearer {api_key}")),
             json!({
                 "model": config.model,
@@ -500,10 +528,25 @@ fn translate_with_advanced(
                 ]
             }),
         )?,
+        "anthropic" => send_json(
+            agent
+                .post(&chat_endpoint(endpoint, "/v1/messages"))
+                .set("x-api-key", api_key)
+                .set("anthropic-version", "2023-06-01"),
+            json!({
+                "model": config.model,
+                "max_tokens": 8192,
+                "temperature": config.temperature,
+                "system": instruction,
+                "messages": [{ "role": "user", "content": content }]
+            }),
+        )?,
         _ => return Err("Unsupported advanced model provider".into()),
     };
     let pointer = if config.provider == "gemini" {
         "/candidates/0/content/parts/0/text"
+    } else if config.provider == "anthropic" {
+        "/content/0/text"
     } else {
         "/choices/0/message/content"
     };
@@ -527,26 +570,42 @@ pub(crate) fn translate_skill_preview(
             },
         });
     }
-    if let Some(content) = read_cached_translation(home, source, target_language)? {
+    let settings = read_store_from(&config_path()?)?;
+    let engine = if settings.advanced.enabled {
+        format!(
+            "llm:{}:{}:{}:{}",
+            settings.advanced.provider,
+            settings.advanced.model,
+            settings.advanced.base_url,
+            settings.advanced.system_prompt
+        )
+    } else if settings.basic.enabled {
+        format!(
+            "dedicated:{}:{}:{}",
+            settings.basic.provider, settings.basic.endpoint, settings.basic.source_language
+        )
+    } else {
+        "disabled".into()
+    };
+    if let Some(content) = read_cached_translation(home, source, target_language, &engine)? {
         return Ok(TranslationResult {
             content,
             status: "cached",
         });
     }
 
-    let settings = read_store_from(&config_path()?)?;
     // LLM remains the explicit first choice for compatibility with older/corrupt stores.
     let (engine, translated) = if settings.advanced.enabled {
         let key = session_key("advanced")?
             .ok_or("LLM translation is enabled, but its session API key is missing")?;
         (
-            format!("llm:{}", settings.advanced.provider),
+            engine.clone(),
             translate_with_advanced(&settings.advanced, &key, source, target_language)?,
         )
     } else if settings.basic.enabled {
         let key = session_key("basic")?;
         (
-            format!("dedicated:{}", settings.basic.provider),
+            engine.clone(),
             translate_with_basic(&settings.basic, key.as_deref(), source, target_language)?,
         )
     } else {
@@ -653,6 +712,21 @@ mod tests {
         assert!(validate_endpoint("http://127.0.0.1:5000", true).is_ok());
         assert!(validate_endpoint("http://localhost:5000", true).is_ok());
     }
+
+    #[test]
+    fn custom_local_llm_endpoint_is_allowed() {
+        let mut request = SaveTranslationSettingsRequest::example_with_keys();
+        request.advanced.base_url = "http://127.0.0.1:8080".into();
+        request.advanced.provider = "anthropic".into();
+        assert!(sanitize_request(request, 0).is_ok());
+    }
+
+    #[test]
+    fn system_prompt_accepts_multiline_instructions() {
+        let mut request = SaveTranslationSettingsRequest::example_with_keys();
+        request.advanced.system_prompt = "Translate carefully.\nPreserve Markdown and YAML.".into();
+        assert!(sanitize_request(request, 0).is_ok());
+    }
     #[test]
     fn api_keys_are_never_serialized() {
         let (stored, _) = sanitize_request(SaveTranslationSettingsRequest::example_with_keys(), 0)
@@ -686,15 +760,15 @@ mod tests {
         ));
         write_cached_translation(&directory, "Hello", "zh-CN", "test", "你好").unwrap();
         assert_eq!(
-            read_cached_translation(&directory, "Hello", "zh-CN").unwrap(),
+            read_cached_translation(&directory, "Hello", "zh-CN", "test").unwrap(),
             Some("你好".into())
         );
         assert_eq!(
-            read_cached_translation(&directory, "Changed", "zh-CN").unwrap(),
+            read_cached_translation(&directory, "Changed", "zh-CN", "test").unwrap(),
             None
         );
         assert_eq!(
-            read_cached_translation(&directory, "Hello", "ja-JP").unwrap(),
+            read_cached_translation(&directory, "Hello", "ja-JP", "test").unwrap(),
             None
         );
         fs::remove_dir_all(directory).expect("cleanup");

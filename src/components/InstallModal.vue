@@ -1,23 +1,21 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import type { IdeOption, ProjectConfig } from "../composables/types";
+import type { IdeOption } from "../composables/types";
 import { useI18n } from "vue-i18n";
 
-const props = defineProps<{
+defineProps<{
   visible: boolean;
   ideOptions: IdeOption[];
-  projects: ProjectConfig[];
 }>();
 
 const emit = defineEmits<{
-  (e: "confirm", installTarget: "ide" | "project", targetIds: string[], projects: ProjectConfig[]): void;
+  (e: "confirm", targetIds: string[]): void;
   (e: "cancel"): void;
 }>();
 
 const { t } = useI18n();
 
 const selectedIdeTargets = ref<string[]>([]);
-const selectedProjectIds = ref<string[]>([]);
 
 function toggleIdeTarget(ideId: string) {
   const index = selectedIdeTargets.value.indexOf(ideId);
@@ -28,36 +26,17 @@ function toggleIdeTarget(ideId: string) {
   }
 }
 
-function toggleProject(projectId: string) {
-  const index = selectedProjectIds.value.indexOf(projectId);
-  if (index === -1) {
-    selectedProjectIds.value.push(projectId);
-  } else {
-    selectedProjectIds.value.splice(index, 1);
-  }
-}
-
 function confirmInstallToIde() {
   if (selectedIdeTargets.value.length === 0) {
     // Button should be disabled, but if clicked somehow, provide feedback
     return;
   }
-  emit("confirm", "ide", [...selectedIdeTargets.value], props.projects);
+  emit("confirm", [...selectedIdeTargets.value]);
   selectedIdeTargets.value = [];
-}
-
-function confirmInstallToProject() {
-  if (selectedProjectIds.value.length === 0) {
-    // Button should be disabled, but if clicked somehow, provide feedback
-    return;
-  }
-  emit("confirm", "project", [...selectedProjectIds.value], props.projects);
-  selectedProjectIds.value = [];
 }
 
 function close() {
   selectedIdeTargets.value = [];
-  selectedProjectIds.value = [];
   emit("cancel");
 }
 </script>
@@ -73,7 +52,7 @@ function close() {
           </div>
 
           <div class="modal-body">
-            <div class="two-columns">
+            <div class="one-column">
               <!-- IDE Column -->
               <div class="column">
                 <div class="column-header">
@@ -100,46 +79,12 @@ function close() {
                 </div>
               </div>
 
-              <!-- Project Column -->
-              <div class="column">
-                <div class="column-header">
-                  <h3 class="column-title">
-                    <span class="icon">Project</span>
-                    {{ t("installModal.project") }}
-                  </h3>
-                  <span class="count">{{ selectedProjectIds.length }} / {{ projects.length }}</span>
-                </div>
-                <div v-if="projects.length === 0" class="empty-hint">
-                  {{ t("installModal.noProjects") }}
-                </div>
-                <div v-else class="options-list">
-                  <label
-                    v-for="project in projects"
-                    :key="project.id"
-                    class="option-item project-item"
-                    :class="{ selected: selectedProjectIds.includes(project.id) }"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="selectedProjectIds.includes(project.id)"
-                      @change="toggleProject(project.id)"
-                    />
-                    <div class="option-content">
-                      <span class="option-label">{{ project.name }}</span>
-                      <span class="option-desc">{{ project.path }}</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
 
           <div class="modal-footer">
             <button class="primary" :disabled="selectedIdeTargets.length === 0" @click="confirmInstallToIde">
               {{ t("installModal.installToIde") }}
-            </button>
-            <button class="primary" :disabled="selectedProjectIds.length === 0 || projects.length === 0" @click="confirmInstallToProject">
-              {{ t("installModal.installToProject") }}
             </button>
             <button class="ghost" @click="close">{{ t("installModal.cancel") }}</button>
           </div>
@@ -215,11 +160,7 @@ function close() {
   padding: 24px;
 }
 
-.two-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
+.one-column { max-width: 560px; margin: 0 auto; }
 
 .column {
   display: flex;
@@ -341,10 +282,6 @@ function close() {
 }
 
 @media (max-width: 768px) {
-  .two-columns {
-    grid-template-columns: 1fr;
-  }
-  
   .column {
     max-height: 40vh;
   }

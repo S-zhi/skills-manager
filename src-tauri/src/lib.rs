@@ -9,12 +9,14 @@ use commands::github_sync::{
 use commands::history::{list_skill_history, restore_skill_history};
 use commands::library_metadata::{get_skill_library_metadata, save_skill_library_entry};
 use commands::market::{download_marketplace_skill, search_marketplaces, update_marketplace_skill};
-use commands::packages::{delete_skill_package, list_skill_packages, save_skill_package};
+use commands::packages::{
+    assign_skill_package_members, delete_skill_package, list_skill_packages,
+    reorder_skill_packages, save_skill_package,
+};
 use commands::skills::{
-    adopt_ide_skill, delete_local_skills, discover_skills_in_directory, export_local_skills,
-    get_manager_storage_info, import_discovered_skills, import_local_skill, link_local_skill,
-    read_local_skill_preview, save_local_skill, scan_overview, scan_project_ide_dirs,
-    uninstall_skill,
+    adopt_ide_skill, delete_local_skills, detect_ide_locations, discover_skills_in_directory,
+    export_local_skills, get_manager_storage_info, import_discovered_skills, import_local_skill,
+    link_local_skill, read_local_skill_preview, save_local_skill, scan_overview, uninstall_skill,
 };
 use commands::skillsmp::search_skillsmp;
 use commands::translation_settings::{
@@ -27,10 +29,10 @@ use tauri::Manager;
 
 pub use crate::types::{
     AdoptIdeSkillRequest, BatchImportRequest, BatchImportResult, DeleteLocalSkillRequest,
-    DiscoveredSkill, ExportSkillsRequest, IdeDir, IdeSkill, ImportRequest, InstallResult,
-    LinkRequest, LinkTarget, LocalScanRequest, LocalSkill, LocalSkillPreview, ManagerStorageInfo,
-    Overview, ProjectIdeDir, ProjectScanRequest, ProjectScanResult, RemoteSkillView,
-    RemoteSkillsViewResponse, SkillDiscoveryRequest, SkillImportItemResult, UninstallRequest,
+    DetectIdeLocationsRequest, DiscoveredSkill, ExportSkillsRequest, IdeBrowseLocation, IdeDir,
+    IdeSkill, ImportRequest, InstallResult, LinkRequest, LinkTarget, LocalScanRequest, LocalSkill,
+    LocalSkillPreview, ManagerStorageInfo, Overview, RemoteSkillView, RemoteSkillsViewResponse,
+    SkillDiscoveryRequest, SkillImportItemResult, UninstallRequest,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -60,6 +62,8 @@ pub fn run() {
             list_skill_packages,
             save_skill_package,
             delete_skill_package,
+            assign_skill_package_members,
+            reorder_skill_packages,
             search_marketplaces,
             search_skillsmp,
             download_marketplace_skill,
@@ -67,6 +71,7 @@ pub fn run() {
             link_local_skill,
             read_local_skill_preview,
             save_local_skill,
+            detect_ide_locations,
             scan_overview,
             uninstall_skill,
             import_local_skill,
@@ -76,7 +81,6 @@ pub fn run() {
             delete_local_skills,
             export_local_skills,
             adopt_ide_skill,
-            scan_project_ide_dirs,
             get_translation_settings,
             save_translation_settings,
             clear_translation_session_key

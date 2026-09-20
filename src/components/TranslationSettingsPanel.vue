@@ -18,10 +18,25 @@ const basicApiKey = ref("");
 const advancedApiKey = ref("");
 
 const basic = reactive({ enabled: false, provider: "azure", endpoint: "https://api.cognitive.microsofttranslator.com", region: "", sourceLanguage: "auto", targetLanguage: "zh-CN" });
-const advanced = reactive({ enabled: false, provider: "gemini", baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-2.5-flash", temperature: 0.2, preserveStructure: true });
+const advanced = reactive({ enabled: false, provider: "gemini", baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-2.5-flash", temperature: 0.2, preserveStructure: true, systemPrompt: "" });
 
 const endpointLabel = computed(() => basic.provider === "libretranslate" ? text("服务地址", "Service URL") : text("API 地址", "API endpoint"));
 const showRegion = computed(() => basic.provider === "azure");
+
+function changeAdvancedProvider(provider: string) {
+  const previous = advanced.provider;
+  advanced.provider = provider;
+  const defaults: Record<string, { baseUrl: string; model: string }> = {
+    gemini: { baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-2.5-flash" },
+    openai: { baseUrl: "https://api.openai.com", model: "gpt-4o-mini" },
+    anthropic: { baseUrl: "https://api.anthropic.com", model: "claude-3-5-sonnet-latest" },
+    "openai-compatible": { baseUrl: "https://api.openai.com", model: "gpt-4o-mini" },
+  };
+  const oldDefaults = defaults[previous];
+  const nextDefaults = defaults[provider];
+  if (oldDefaults && nextDefaults && advanced.baseUrl === oldDefaults.baseUrl) advanced.baseUrl = nextDefaults.baseUrl;
+  if (oldDefaults && nextDefaults && advanced.model === oldDefaults.model) advanced.model = nextDefaults.model;
+}
 
 function enableBasic(enabled: boolean) {
   basic.enabled = enabled;
@@ -108,9 +123,10 @@ onMounted(load);
         <div class="card-heading"><div><span class="eyebrow">{{ text("优先引擎", "PREFERRED") }}</span><h3>{{ text("大模型翻译", "LLM translation") }}</h3><p>{{ text("适合保持上下文、术语与 Markdown 结构；启用时优先使用。", "For context, terminology, and Markdown-aware translation; preferred when enabled.") }}</p></div><label class="engine-switch"><input type="checkbox" :checked="advanced.enabled" @change="enableAdvanced(($event.target as HTMLInputElement).checked)" /><span>{{ advanced.enabled ? text("已启用", "Enabled") : text("未启用", "Disabled") }}</span></label></div>
         <div class="engine-state"><span class="status" :class="{ ready: advancedConfigured }">{{ advancedConfigured ? text("密钥已就绪", "Key ready") : text("未配置密钥", "No key") }}</span></div>
         <div class="form-grid">
-          <label><span>{{ text("服务商", "Provider") }}</span><select v-model="advanced.provider"><option value="gemini">Gemini</option><option value="openai-compatible">OpenAI Compatible</option></select></label>
-          <label><span>{{ text("模型", "Model") }}</span><input v-model="advanced.model" placeholder="gemini-2.5-flash" /></label>
-          <label class="wide"><span>Base URL</span><input v-model="advanced.baseUrl" placeholder="https://…" /></label>
+          <label><span>{{ text("协议", "Protocol") }}</span><select :value="advanced.provider" @change="changeAdvancedProvider(($event.target as HTMLSelectElement).value)"><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="gemini">Gemini（兼容旧配置）</option><option value="openai-compatible">OpenAI Compatible（旧配置）</option></select></label>
+          <label><span>{{ text("模型", "Model") }}</span><input v-model="advanced.model" :placeholder="advanced.provider === 'anthropic' ? 'claude-3-5-sonnet-latest' : 'gpt-4o-mini'" /></label>
+          <label class="wide"><span>Base URL <small>{{ text("可填写中转站地址；OpenAI/Anthropic 会自动补全协议路径", "Custom relay URL; protocol path is appended automatically") }}</small></span><input v-model="advanced.baseUrl" placeholder="https://api.openai.com 或 https://your-relay.example.com" /></label>
+          <label class="wide"><span>System Prompt <small>{{ text("告诉模型如何翻译；会自动附加目标语言", "Tell the model how to translate; target language is appended automatically") }}</small></span><textarea v-model="advanced.systemPrompt" rows="5" placeholder="You translate Skill documents accurately..." /></label>
           <label><span>Temperature</span><input v-model.number="advanced.temperature" type="number" min="0" max="1" step="0.1" /></label>
           <label class="toggle-label"><input v-model="advanced.preserveStructure" type="checkbox" /><span>{{ text("严格保持 Markdown、YAML 与代码结构", "Preserve Markdown, YAML, and code structure") }}</span></label>
           <label class="wide"><span>API Key <small>{{ text("仅本次会话", "session only") }}</small></span><div class="key-row"><input v-model="advancedApiKey" type="password" autocomplete="off" :placeholder="advancedConfigured ? text('已配置；留空则保持', 'Configured; leave blank to keep') : text('输入密钥', 'Enter API key')" /><button v-if="advancedConfigured" class="text-button" @click="clearKey('advanced')">{{ text("清除", "Clear") }}</button></div></label>
@@ -125,6 +141,8 @@ onMounted(load);
 </template>
 
 <style scoped>
+.form-grid textarea { min-width: 0; resize: vertical; line-height: 1.5; border: 1px solid var(--color-input-border); background: var(--color-input-bg); color: var(--color-text); border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; }
+.form-grid textarea:focus { border-color: var(--color-input-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-bg) 15%, transparent); }
 .translation-settings{display:flex;flex-direction:column;gap:16px}.page-intro,.card-heading{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.page-intro h2,.card-heading h3{margin:0;color:var(--color-text)}.page-intro h2{font-size:22px}.page-intro p,.card-heading p{margin:6px 0 0;color:var(--color-muted);font-size:13px;line-height:1.55}.stage-badge,.status{white-space:nowrap;border:1px solid var(--color-chip-border);background:var(--color-chip-bg);color:var(--color-muted);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:600}.status.ready{color:var(--color-success-text);background:var(--color-success-bg);border-color:var(--color-success-border)}.config-card,.state-card{background:var(--color-panel-bg);border:1px solid var(--color-panel-border);border-radius:16px;padding:20px;box-shadow:0 4px 16px var(--color-panel-shadow)}.config-card.disabled{border-style:dashed}.advanced-card{border-top-color:var(--color-primary-bg)}.eyebrow{display:block;color:var(--color-accent);font-size:10px;letter-spacing:.12em;font-weight:700;margin-bottom:6px}.engine-switch{display:flex;align-items:center;gap:8px;white-space:nowrap;color:var(--color-text);font-size:12px;font-weight:700}.engine-switch input{width:17px;height:17px;accent-color:var(--color-primary-bg)}.engine-state{display:flex;margin-top:12px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:20px}.form-grid label{display:flex;flex-direction:column;gap:7px;color:var(--color-muted);font-size:12px;font-weight:600}.form-grid label.wide{grid-column:1/-1}.form-grid input,.form-grid select{min-width:0;border:1px solid var(--color-input-border);background:var(--color-input-bg);color:var(--color-text);border-radius:10px;padding:10px 12px;font:inherit;font-weight:400;outline:none}.form-grid input:focus,.form-grid select:focus{border-color:var(--color-input-focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary-bg) 15%,transparent)}small{font-weight:400;color:var(--color-muted)}.key-row{display:flex;gap:8px}.key-row input{flex:1}.text-button{border:1px solid var(--color-ghost-border);background:transparent;color:var(--color-ghost-text);border-radius:9px;padding:0 13px;cursor:pointer}.toggle-label{flex-direction:row!important;align-items:center;align-self:end;min-height:38px}.toggle-label input{width:16px;height:16px;accent-color:var(--color-primary-bg)}.notice,.security-note{border-radius:11px;padding:12px 14px;font-size:12px;line-height:1.55}.notice{margin-top:15px;background:var(--color-chip-bg);color:var(--color-muted);border:1px solid var(--color-chip-border)}.security-note{display:flex;flex-direction:column;gap:4px;background:var(--color-card-bg);color:var(--color-muted);border:1px solid var(--color-card-border);word-break:break-all}.security-note strong{color:var(--color-text)}.actions{display:flex;justify-content:flex-end}.primary{border:0;border-radius:10px;padding:10px 18px;background:var(--color-primary-bg);color:var(--color-primary-text);font-weight:600;cursor:pointer}.primary:disabled{opacity:.6}.message{margin:0;border-radius:9px;padding:10px 13px;font-size:13px}.message.error{color:var(--color-danger-text);background:var(--color-danger-bg)}.message.success{color:var(--color-success-text);background:var(--color-success-bg)}
 @media(max-width:680px){.form-grid{grid-template-columns:1fr}.form-grid label.wide{grid-column:auto}.page-intro,.card-heading{flex-direction:column}.stage-badge,.status{align-self:flex-start}}
 </style>

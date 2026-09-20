@@ -9,14 +9,20 @@ export default {
     identityHint: '自动生成独立 UUID，同名目录不会被覆盖。', success: 'Skill 创建成功', view: '查看我的 Skills', another: '继续新建', close: '关闭新建 Skill 窗口'
   },
   packages: {
-    title: "Skill 包", hint: "按用途组合已有 Skill。同一个 Skill 可加入多个包，文件仍保留在统一仓库。",
-    create: "创建 Skill 包", edit: "编辑包", choose: "选择 Skill 包", empty: "还没有 Skill 包，创建一个来组合常用技能。",
+    title: "Skill 包", hint: "按用途组合已有 Skill，每个 Skill 只能属于一个包。",
+    create: "新建 Skill 包", edit: "编辑包", rename: "重命名", choose: "选择 Skill 包", empty: "还没有 Skill 包，创建一个来组合常用技能。",
     name: "包名称", description: "描述", members: "成员 Skills", search: "搜索 Skill 名称、UUID 或路径",
     save: "保存", cancel: "取消", delete: "删除包", confirmDelete: "确认删除包",
     deleteConfirm: "删除此包？只删除分组配置，成员 Skill 文件仍然保留。",
     saved: "Skill 包已保存", deleted: "Skill 包已删除", loading: "正在加载…",
     missing: "成员缺失（可在编辑包时取消勾选移除）", noMembers: "此包暂无成员，可点击编辑包添加。",
-    install: "安装包内可用 Skills", export: "导出包内可用 Skills（ZIP）"
+    install: "安装包内可用 Skills", export: "导出包内可用 Skills（ZIP）",
+    uncategorized: "未分类", assignOne: "标记 Skill 包", assignSelected: "归入 Skill 包 ({count})",
+    assignTitle: "归类 {count} 个 Skill", assign: "确认归类", assigned: "Skill 归类已更新",
+    singleOwnerHint: "归类后将从原 Skill 包移出；选择“未分类”可清除当前归属。",
+    dragHint: "拖动蓝色把手调整分组顺序",
+    moreActions: "分组更多操作",
+    systemGroupHint: "系统默认分组，不可重命名或删除。"
   },
   app: {
     tabs: {
@@ -24,7 +30,6 @@ export default {
       discover: "发现与导入",
       market: "Market",
       ide: "IDE 浏览",
-      projects: "项目管理",
       settings: "设置"
     },
     header: {
@@ -145,6 +150,10 @@ export default {
     },
     preview: "预览",
     previewTitle: "Skill 预览",
+    previewVersion: "预览版本",
+    previewOriginal: "英文原版",
+    previewTranslated: "中文翻译版",
+    previewTranslationUnavailable: "暂未生成翻译，当前显示原版",
     previewEmptyDescription: "暂无描述",
     previewUsedBy: "已关联编辑器",
     previewPath: "路径",
@@ -196,7 +205,7 @@ export default {
   },
   ide: {
     title: "IDE 浏览",
-    switchHint: "切换 IDE 查看其技能列表。",
+    switchHint: "仅展示本机已识别的 IDE 和实际存在的公共目录。",
     total: "当前列表 {count}",
     selectAll: "全选",
     addHint: "添加自定义 IDE（名称 + 相对路径或绝对路径）。",
@@ -206,6 +215,11 @@ export default {
     deleteButton: "删除",
     loading: "加载中...",
     emptyHint: "该 IDE 暂无 skills",
+    noDetectedLocations: "暂未识别到已安装的 IDE 或可浏览的公共目录。你仍可在下方绑定自定义路径。",
+    detectedIde: "已识别 IDE · Skill 路径",
+    commonSource: "公共目录",
+    commonDirectory: "公共",
+    directoryNotInitialized: "Skill 目录尚未创建",
     sourceLink: "链接",
     sourceLocal: "本地",
     unmanaged: "未托管",
@@ -219,12 +233,8 @@ export default {
   installModal: {
     selectTargetTitle: "选择安装目标",
     globalIde: "全局 IDE",
-    globalIdeDesc: "安装到全局 IDE 目录，所有项目可用",
-    project: "项目",
-    projectDesc: "安装到项目目录，仅该项目可用",
-    noProjects: "暂无项目",
+    globalIdeDesc: "安装到全局 IDE 目录",
     installToIde: "安装到 IDE",
-    installToProject: "安装到项目",
     cancel: "取消"
   },
   uninstallModal: {
@@ -256,8 +266,7 @@ export default {
     handled: "已处理 {linked} 个目标，跳过 {skipped} 个目标。",
     imported: "成功导入 {success} 个 Skill，失败 {failed} 个。",
     batchImported: "导入完成：新增 {imported} 个，跳过 {skipped} 个，失败 {failed} 个。",
-    exported: "已导出到 {path}",
-    selectSkillsForProject: "请为项目 {name} 选择要安装的 Skills"
+    exported: "已导出到 {path}"
   },
   errors: {
     searchFailed: "搜索失败，请重试。",
@@ -280,8 +289,7 @@ export default {
     selectAtLeastOne: "请选择至少一个 IDE",
     unsupportedManualUrl: "仅支持 GitHub 仓库链接、GitHub 子目录链接或 ZIP 下载链接。",
     manualSkillNameRequired: "无法从 URL 推断技能名，请手动填写。",
-    invalidPath: "路径必须是相对路径或有效的绝对路径。",
-    projectNoIdeTargets: "项目尚未配置 IDE 目标，请先配置。"
+    invalidPath: "路径必须是相对路径或有效的绝对路径。"
   },
   update: {
     available: "发现新版本: {version}",
@@ -307,33 +315,5 @@ export default {
     done: "完成",
     error: "下载失败",
     retry: "重试"
-  },
-  projects: {
-    title: "项目管理",
-    hint: "为不同项目配置独立的 Skills 环境。",
-    add: "添加项目",
-    addTitle: "添加新项目",
-    addHint: "选择项目文件夹并输入项目名称。",
-    pathPlaceholder: "例如：/Users/name/my-project 或 C:\\Projects\\my-project",
-    namePlaceholder: "例如：My Project",
-    remove: "移除",
-    select: "选中",
-    deselect: "取消",
-    configure: "配置",
-    configureTitle: "配置项目 IDE 目标",
-    linkSkills: "安装 Skills",
-    openDirectory: "打开目录",
-    emptyHint: "暂无项目，点击上方按钮添加。",
-    projectPath: "项目路径",
-    projectName: "项目名称",
-    selectIdeTargets: "选择 IDE 目标",
-    configureHint: "选择该项目需要使用的 IDE，安装 Skills 时会链接到这些 IDE 的项目目录。",
-    cancel: "取消",
-    save: "保存",
-    ideTargets: "IDE 目标：{count} 个",
-    detected: "已检测：{count} 个",
-    selectFolder: "选择项目文件夹",
-    selectFolderButton: "选择文件夹",
-    untitled: "未命名项目"
   }
 };

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { LocalSkill, LocalSkillPreview } from "../composables/types";
 
 const { t } = useI18n();
+const viewMode = ref<"translated" | "original">("translated");
 
 const props = defineProps<{
   visible: boolean;
@@ -22,7 +23,9 @@ const usedByText = computed(() => {
 });
 
 const descriptionText = computed(() => {
-  const value = props.preview?.displayDescription?.trim() || props.skill?.description?.trim();
+  const value = viewMode.value === "original"
+    ? props.skill?.description?.trim()
+    : props.preview?.displayDescription?.trim() || props.skill?.description?.trim();
   return value || t("local.previewEmptyDescription");
 });
 
@@ -31,6 +34,15 @@ const translationLabel = computed(() => {
   if (!status || status === "original") return "";
   return t(`local.translationStatus.${status}`);
 });
+
+const hasTranslation = computed(() => props.preview?.translationStatus === "translated" || props.preview?.translationStatus === "cached");
+const displayedContent = computed(() => viewMode.value === "original"
+  ? props.preview?.originalContent ?? props.preview?.skillMdContent ?? ""
+  : props.preview?.skillMdContent ?? "");
+
+watch(() => [props.visible, props.preview?.translationStatus], () => {
+  viewMode.value = hasTranslation.value ? "translated" : "original";
+}, { immediate: true });
 
 function close() {
   emit("close");
@@ -65,11 +77,19 @@ function close() {
 
           <div class="preview-markdown">
             <div class="preview-markdown-header">
-              <span class="preview-markdown-title">{{ t("local.previewSkillMdPath") }}</span>
+              <div class="preview-markdown-heading">
+                <span class="preview-markdown-title">{{ t("local.previewSkillMdPath") }}</span>
+                <span class="preview-mode-label">{{ viewMode === "translated" ? t("local.previewTranslated") : t("local.previewOriginal") }}</span>
+              </div>
               <span class="preview-markdown-path">{{ preview?.skillMdPath ?? "-" }}</span>
             </div>
+            <div class="preview-switcher" role="group" :aria-label="t('local.previewVersion')">
+              <button type="button" :class="{ active: viewMode === 'original' }" @click="viewMode = 'original'">{{ t("local.previewOriginal") }}</button>
+              <button type="button" :disabled="!hasTranslation" :class="{ active: viewMode === 'translated' }" @click="viewMode = 'translated'">{{ t("local.previewTranslated") }}</button>
+              <span v-if="!hasTranslation && !loading" class="preview-switcher-hint">{{ t("local.previewTranslationUnavailable") }}</span>
+            </div>
             <div v-if="loading" class="preview-loading">{{ t("local.processing") }}</div>
-            <pre v-else class="preview-markdown-content">{{ preview?.skillMdContent ?? "" }}</pre>
+            <pre v-else class="preview-markdown-content">{{ displayedContent }}</pre>
           </div>
         </div>
       </div>
@@ -212,6 +232,15 @@ function close() {
   border-bottom: 1px solid var(--color-card-border);
   background: var(--color-card-bg);
 }
+
+.preview-markdown-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.preview-mode-label { padding: 4px 8px; border-radius: 999px; background: var(--color-chip-bg); color: var(--color-muted); font-size: 11px; font-weight: 600; }
+.preview-switcher { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--color-card-border); background: var(--color-panel-bg); }
+.preview-switcher button { border: 1px solid var(--color-panel-border); border-radius: 8px; padding: 7px 12px; background: transparent; color: var(--color-muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.preview-switcher button:hover:not(:disabled) { border-color: var(--color-accent-border); color: var(--color-accent); }
+.preview-switcher button.active { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-primary-text); }
+.preview-switcher button:disabled { cursor: not-allowed; opacity: .45; }
+.preview-switcher-hint { color: var(--color-muted); font-size: 11px; }
 
 .preview-markdown-path {
   color: var(--color-text);

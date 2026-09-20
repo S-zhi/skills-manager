@@ -85,6 +85,7 @@ pub struct LocalSkill {
 #[serde(rename_all = "camelCase")]
 pub struct LocalSkillPreview {
     pub skill_md_path: String,
+    pub original_content: String,
     pub skill_md_content: String,
     pub display_description: Option<String>,
     pub translation_status: String,
@@ -128,6 +129,23 @@ pub struct UninstallRequest {
 pub struct IdeDir {
     pub label: String,
     pub relative_dir: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectIdeLocationsRequest {
+    pub ide_dirs: Vec<IdeDir>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct IdeBrowseLocation {
+    pub label: String,
+    pub relative_dir: String,
+    pub resolved_path: String,
+    pub kind: String,
+    pub detected_by: String,
+    pub directory_exists: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -218,25 +236,4 @@ pub struct ExportSkillsRequest {
 pub struct AdoptIdeSkillRequest {
     pub target_path: String,
     pub ide_label: String,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectScanRequest {
-    pub project_dir: String,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectIdeDir {
-    pub label: String,
-    pub relative_dir: String,
-    pub absolute_path: String,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectScanResult {
-    pub project_dir: String,
-    pub detected_ide_dirs: Vec<ProjectIdeDir>,
 }

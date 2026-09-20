@@ -1,8 +1,8 @@
 use crate::types::{
     AdoptIdeSkillRequest, BatchImportRequest, BatchImportResult, DeleteLocalSkillRequest,
-    DiscoveredSkill, ExportSkillsRequest, IdeSkill, ImportRequest, InstallResult, LinkRequest,
-    LocalScanRequest, LocalSkill, LocalSkillPreview, ManagerStorageInfo, Overview, ProjectIdeDir,
-    ProjectScanRequest, ProjectScanResult, SkillDiscoveryRequest, SkillImportItemResult,
+    DetectIdeLocationsRequest, DiscoveredSkill, ExportSkillsRequest, IdeBrowseLocation, IdeDir,
+    IdeSkill, ImportRequest, InstallResult, LinkRequest, LocalScanRequest, LocalSkill,
+    LocalSkillPreview, ManagerStorageInfo, Overview, SkillDiscoveryRequest, SkillImportItemResult,
     UninstallRequest,
 };
 use crate::utils::download::copy_dir_recursive;
@@ -33,6 +33,11 @@ const ISSUE_INVALID_NAME: &str = "invalid_name";
 const ISSUE_MISSING_DESCRIPTION: &str = "missing_description";
 const ISSUE_DESCRIPTION_TOO_LONG: &str = "description_too_long";
 const ISSUE_DIRECTORY_NAME_MISMATCH: &str = "directory_name_mismatch";
+
+const SHARED_BROWSE_DIRS: &[(&str, &str)] = &[
+    ("Agents", ".agents/skills"),
+    ("Agents (XDG)", ".config/agents/skills"),
+];
 
 struct ManagerLayout {
     root: PathBuf,
@@ -1205,6 +1210,215 @@ pub fn link_local_skill(request: LinkRequest) -> Result<InstallResult, String> {
     })
 }
 
+fn resolve_ide_directory(home: &Path, raw_path: &str) -> Result<PathBuf, String> {
+    if !is_valid_ide_path(raw_path) {
+        return Err("Invalid IDE directory".to_string());
+    }
+    Ok(if is_absolute_ide_path(raw_path) {
+        PathBuf::from(raw_path)
+    } else {
+        home.join(raw_path)
+    })
+}
+
+fn ide_config_directory(skill_dir: &Path, label: &str) -> Option<PathBuf> {
+    // .github is a common repository directory and is not evidence that VS Code is installed.
+    if label.eq_ignore_ascii_case("vscode") || label.eq_ignore_ascii_case("visual studio code") {
+        return None;
+    }
+    skill_dir.parent().map(Path::to_path_buf)
+}
+
+fn executable_on_path(names: &[&str]) -> bool {
+    let Some(path) = std::env::var_os("PATH") else {
+        return false;
+    };
+
+    #[cfg(target_family = "windows")]
+    let extensions: Vec<String> = std::env::var("PATHEXT")
+        .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string())
+        .split(';')
+        .map(|item| item.to_ascii_lowercase())
+        .collect();
+
+    std::env::split_paths(&path).any(|directory| {
+        names.iter().any(|name| {
+            let direct = directory.join(name);
+            if direct.is_file() {
+                return true;
+            }
+            #[cfg(target_family = "windows")]
+            {
+                if Path::new(name).extension().is_none() {
+                    return extensions
+                        .iter()
+                        .any(|extension| directory.join(format!("{name}{extension}")).is_file());
+                }
+            }
+            false
+        })
+    })
+}
+
+fn known_executable_names(label: &str) -> &'static [&'static str] {
+    match label.to_ascii_lowercase().as_str() {
+        "antigravity" => &["antigravity"],
+        "claude" | "claude code" => &["claude"],
+        "codebuddy" => &["codebuddy"],
+        "codex" => &["codex"],
+        "cursor" => &["cursor"],
+        "kiro" => &["kiro"],
+        "openclaw" => &["openclaw"],
+        "opencode" | "open code" => &["opencode"],
+        "qoder" => &["qoder"],
+        "trae" => &["trae"],
+        "vscode" | "visual studio code" => &["code", "code-insiders"],
+        "windsurf" => &["windsurf"],
+        _ => &[],
+    }
+}
+
+fn known_install_paths(label: &str) -> Vec<PathBuf> {
+    let normalized = label.to_ascii_lowercase();
+    let mut roots = Vec::new();
+
+    #[cfg(target_family = "windows")]
+    {
+        let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+        let program_files = std::env::var_os("ProgramFiles").map(PathBuf::from);
+        let program_files_x86 = std::env::var_os("ProgramFiles(x86)").map(PathBuf::from);
+        let specs: &[(&str, &[&str])] = &[
+            (
+                "cursor",
+                &["Programs/Cursor/Cursor.exe", "Cursor/Cursor.exe"],
+            ),
+            ("kiro", &["Programs/Kiro/Kiro.exe"]),
+            ("qoder", &["Programs/Qoder/Qoder.exe"]),
+            ("trae", &["Programs/Trae/Trae.exe"]),
+            ("windsurf", &["Programs/Windsurf/Windsurf.exe"]),
+            (
+                "vscode",
+                &[
+                    "Programs/Microsoft VS Code/Code.exe",
+                    "Microsoft VS Code/Code.exe",
+                ],
+            ),
+            (
+                "visual studio code",
+                &[
+                    "Programs/Microsoft VS Code/Code.exe",
+                    "Microsoft VS Code/Code.exe",
+                ],
+            ),
+        ];
+        if let Some((_, paths)) = specs.iter().find(|(name, _)| *name == normalized) {
+            for root in [
+                local.as_ref(),
+                program_files.as_ref(),
+                program_files_x86.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                roots.extend(paths.iter().map(|path| root.join(path)));
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let app_name = match normalized.as_str() {
+            "cursor" => Some("Cursor.app"),
+            "kiro" => Some("Kiro.app"),
+            "qoder" => Some("Qoder.app"),
+            "trae" => Some("Trae.app"),
+            "vscode" | "visual studio code" => Some("Visual Studio Code.app"),
+            "windsurf" => Some("Windsurf.app"),
+            _ => None,
+        };
+        if let Some(app_name) = app_name {
+            roots.push(PathBuf::from("/Applications").join(app_name));
+        }
+    }
+
+    roots
+}
+
+fn detect_external_ide_signal(label: &str) -> Option<String> {
+    let executable_names = known_executable_names(label);
+    if !executable_names.is_empty() && executable_on_path(executable_names) {
+        return Some("executable".to_string());
+    }
+    if known_install_paths(label).iter().any(|path| path.exists()) {
+        return Some("installation-path".to_string());
+    }
+    None
+}
+
+fn detect_browse_locations_for<F>(
+    home: &Path,
+    ide_dirs: &[IdeDir],
+    external_signal: F,
+) -> Result<Vec<IdeBrowseLocation>, String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let mut locations = Vec::new();
+
+    for ide in ide_dirs {
+        let resolved = resolve_ide_directory(home, &ide.relative_dir)
+            .map_err(|_| format!("Invalid IDE directory: {}", ide.label))?;
+        let directory_exists = resolved.is_dir();
+        let detected_by = if directory_exists {
+            Some("skills-directory".to_string())
+        } else if ide_config_directory(&resolved, &ide.label).is_some_and(|path| path.is_dir()) {
+            Some("configuration-directory".to_string())
+        } else {
+            external_signal(&ide.label)
+        };
+
+        if let Some(detected_by) = detected_by {
+            locations.push(IdeBrowseLocation {
+                label: ide.label.clone(),
+                relative_dir: ide.relative_dir.clone(),
+                resolved_path: resolved.display().to_string(),
+                kind: "ide".to_string(),
+                detected_by,
+                directory_exists,
+            });
+        }
+    }
+
+    for (label, relative_dir) in SHARED_BROWSE_DIRS {
+        let resolved = home.join(relative_dir);
+        if resolved.is_dir()
+            && !locations
+                .iter()
+                .any(|item| Path::new(&item.resolved_path) == resolved)
+        {
+            locations.push(IdeBrowseLocation {
+                label: (*label).to_string(),
+                relative_dir: (*relative_dir).to_string(),
+                resolved_path: resolved.display().to_string(),
+                kind: "common".to_string(),
+                detected_by: "common-directory".to_string(),
+                directory_exists: true,
+            });
+        }
+    }
+
+    locations.sort_by_key(|item| item.label.to_lowercase());
+    Ok(locations)
+}
+
+#[tauri::command]
+pub fn detect_ide_locations(
+    request: DetectIdeLocationsRequest,
+) -> Result<Vec<IdeBrowseLocation>, String> {
+    let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
+    detect_browse_locations_for(&home, &request.ide_dirs, detect_external_ide_signal)
+}
+
 #[tauri::command]
 pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
     let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
@@ -1218,40 +1432,15 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
     )?);
 
     // Resolve IDE directories: absolute paths are used directly, relative paths are joined with home
-    let ide_dirs: Vec<(String, PathBuf)> = if request.ide_dirs.is_empty() {
-        vec![
-            (
-                "Antigravity".to_string(),
-                home.join(".gemini/antigravity/skills"),
-            ),
-            ("Claude".to_string(), home.join(".claude/skills")),
-            ("CodeBuddy".to_string(), home.join(".codebuddy/skills")),
-            ("Codex".to_string(), home.join(".codex/skills")),
-            ("Cursor".to_string(), home.join(".cursor/skills")),
-            ("Kiro".to_string(), home.join(".kiro/skills")),
-            ("Qoder".to_string(), home.join(".qoder/skills")),
-            ("Trae".to_string(), home.join(".trae/skills")),
-            ("VSCode".to_string(), home.join(".github/skills")),
-            ("Windsurf".to_string(), home.join(".windsurf/skills")),
-        ]
-    } else {
-        request
-            .ide_dirs
-            .iter()
-            .map(|item| {
-                if !is_valid_ide_path(&item.relative_dir) {
-                    return Err(format!("Invalid IDE directory: {}", item.label));
-                }
-                // Absolute path: use directly
-                if is_absolute_ide_path(&item.relative_dir) {
-                    Ok((item.label.clone(), PathBuf::from(&item.relative_dir)))
-                } else {
-                    // Relative path: join with home directory
-                    Ok((item.label.clone(), home.join(&item.relative_dir)))
-                }
-            })
-            .collect::<Result<Vec<_>, String>>()?
-    };
+    let ide_dirs: Vec<(String, PathBuf)> = request
+        .ide_dirs
+        .iter()
+        .map(|item| {
+            resolve_ide_directory(&home, &item.relative_dir)
+                .map(|path| (item.label.clone(), path))
+                .map_err(|_| format!("Invalid IDE directory: {}", item.label))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     let mut ide_skills: Vec<IdeSkill> = Vec::new();
 
@@ -1573,7 +1762,7 @@ pub fn read_local_skill_preview(
             language,
         )?,
         None => crate::commands::translation_settings::TranslationResult {
-            content: original_content,
+            content: original_content.clone(),
             status: "original",
         },
     };
@@ -1581,6 +1770,7 @@ pub fn read_local_skill_preview(
 
     Ok(LocalSkillPreview {
         skill_md_path: skill_md_path.display().to_string(),
+        original_content,
         skill_md_content: translated.content,
         display_description,
         translation_status: translated.status.to_string(),
@@ -1609,6 +1799,7 @@ fn save_local_skill_document(
         let display_description = parse_skill_document(&current).description;
         return Ok(LocalSkillPreview {
             skill_md_path: file.display().to_string(),
+            original_content: current.clone(),
             skill_md_content: current,
             display_description,
             translation_status: "original".into(),
@@ -1684,6 +1875,7 @@ fn save_local_skill_document(
     result?;
     Ok(LocalSkillPreview {
         skill_md_path: file.display().to_string(),
+        original_content: request.content.clone(),
         skill_md_content: request.content,
         display_description: edited.description,
         translation_status: "original".into(),
@@ -1752,48 +1944,6 @@ pub fn export_local_skills(request: ExportSkillsRequest) -> Result<String, Strin
     Ok(export_path.display().to_string())
 }
 
-#[tauri::command]
-pub fn scan_project_ide_dirs(request: ProjectScanRequest) -> Result<ProjectScanResult, String> {
-    let project_dir = PathBuf::from(&request.project_dir);
-
-    if !project_dir.exists() {
-        return Err("Project directory does not exist".to_string());
-    }
-
-    let ide_dir_patterns = [
-        (".gemini/antigravity/skills", "Antigravity"),
-        (".claude/skills", "Claude Code"),
-        (".codebuddy/skills", "CodeBuddy"),
-        (".codex/skills", "Codex"),
-        (".cursor/skills", "Cursor"),
-        (".kiro/skills", "Kiro"),
-        (".openclaw/skills", "OpenClaw"),
-        (".opencode/skills", "OpenCode"),
-        (".qoder/skills", "Qoder"),
-        (".trae/skills", "Trae"),
-        (".github/skills", "VSCode"),
-        (".windsurf/skills", "Windsurf"),
-    ];
-
-    let mut detected_ide_dirs = Vec::new();
-
-    for (relative_path, label) in ide_dir_patterns.iter() {
-        let ide_path = project_dir.join(relative_path);
-        if ide_path.exists() && ide_path.is_dir() {
-            detected_ide_dirs.push(ProjectIdeDir {
-                label: label.to_string(),
-                relative_dir: relative_path.to_string(),
-                absolute_path: ide_path.display().to_string(),
-            });
-        }
-    }
-
-    Ok(ProjectScanResult {
-        project_dir: request.project_dir,
-        detected_ide_dirs,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1842,6 +1992,79 @@ mod tests {
                     .count()
             })
             .unwrap_or(0)
+    }
+
+    #[test]
+    fn browse_location_detection_hides_missing_editors_and_adds_shared_agent_dirs() {
+        let root = test_dir("browse-location-detection");
+        let home = root.join("home");
+        fs::create_dir_all(home.join(".cursor")).expect("create Cursor config root");
+        fs::create_dir_all(home.join(".agents/skills/sample-agent"))
+            .expect("create shared agent directory");
+
+        let ide_dirs = vec![
+            crate::types::IdeDir {
+                label: "Cursor".to_string(),
+                relative_dir: ".cursor/skills".to_string(),
+            },
+            crate::types::IdeDir {
+                label: "VSCode".to_string(),
+                relative_dir: ".github/skills".to_string(),
+            },
+        ];
+
+        let locations = detect_browse_locations_for(&home, &ide_dirs, |_| None)
+            .expect("detect browse locations");
+
+        assert!(locations
+            .iter()
+            .any(|item| item.label == "Cursor" && item.kind == "ide"));
+        assert!(!locations.iter().any(|item| item.label == "VSCode"));
+        assert!(locations.iter().any(|item| {
+            item.label == "Agents" && item.kind == "common" && item.relative_dir == ".agents/skills"
+        }));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn browse_location_detection_keeps_executable_backed_and_absolute_custom_targets() {
+        let root = test_dir("browse-location-signals");
+        let home = root.join("home");
+        let custom_skills = root.join("custom-editor/skills");
+        fs::create_dir_all(&custom_skills).expect("create custom skill directory");
+
+        let ide_dirs = vec![
+            crate::types::IdeDir {
+                label: "VSCode".to_string(),
+                relative_dir: ".github/skills".to_string(),
+            },
+            crate::types::IdeDir {
+                label: "Custom Editor".to_string(),
+                relative_dir: custom_skills.display().to_string(),
+            },
+        ];
+
+        let locations = detect_browse_locations_for(&home, &ide_dirs, |label| {
+            (label == "VSCode").then(|| "executable".to_string())
+        })
+        .expect("detect executable and custom locations");
+
+        let vscode = locations
+            .iter()
+            .find(|item| item.label == "VSCode")
+            .expect("VSCode should be detected from its executable");
+        assert_eq!(vscode.detected_by, "executable");
+        assert!(!vscode.directory_exists);
+
+        let custom = locations
+            .iter()
+            .find(|item| item.label == "Custom Editor")
+            .expect("absolute custom directory should be detected");
+        assert_eq!(custom.detected_by, "skills-directory");
+        assert!(custom.directory_exists);
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
