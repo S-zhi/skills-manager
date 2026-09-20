@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "auto-updater": {
+      "name": "Auto-Updater Skill",
+      "zip_url": "http://lightmake.site/api/v1/download?slug=auto-updater",
+      "source": "skillhub",
+      "version": "1.0.0"
+    }
+  }
+}

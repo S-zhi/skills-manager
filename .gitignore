@@ -1,0 +1,10 @@
+node_modules
+.npm-cache
+.clawdbot
+.omc
+.DS_Store
+/dist
+/src-tauri/target
+/references
+/others
+skills-manager.key
